@@ -1,0 +1,30 @@
+[rpc]
+# Use a paid low-latency Tokyo BNB Chain endpoint for real runs.
+http_url = "https://bsc-dataseed.bnbchain.org"
+ws_url = "wss://your-bnb-ws-endpoint.example"
+
+[wallet]
+private_key_env = "SNIPER_PRIVATE_KEY"
+
+[contracts]
+# Official 42 Docs deployment addresses checked on 2026-05-26.
+controller = "0xF21b2D4F8989b27f732e369907F25f0E8D95Fe62"
+router = "0x88888888338e60bfB4657187169cFFa5c8640E42"
+collateral = "0x55d398326f99059fF775485246999027B3197955"
+
+[strategy]
+outcome_token_id = "1"
+buy_amount_units = "10"
+collateral_decimals = 18
+min_out_or_max_in = "0"
+gas_limit = 300000
+gas_price_bump_bps = 2000
+dry_run = true
+
+[metadata]
+enabled = false
+rest_base_url = "https://rest.ft.42.space/api/v1"
+timeout_ms = 250
+
+[filters]
+allowed_collateral = ["0x55d398326f99059fF775485246999027B3197955"]

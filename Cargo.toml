@@ -1,0 +1,28 @@
+[package]
+name = "forty-two-sniper"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/Alchemist-X/forty-two-sniper"
+description = "Low-latency 42Space market listener and execution scaffold for BNB Chain."
+
+[dependencies]
+alloy = { version = "2.0.5", features = ["provider-ws"] }
+clap = { version = "4.5.51", features = ["derive", "env"] }
+eyre = "0.6.12"
+futures-util = "0.3.31"
+reqwest = { version = "0.12.24", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
+tokio = { version = "1.52.3", features = ["macros", "rt-multi-thread", "signal", "time"] }
+toml = "0.9.8"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.22", features = ["env-filter", "fmt"] }
+url = "2.5.7"
+
+[profile.release]
+codegen-units = 1
+lto = "thin"
+opt-level = 3
+panic = "abort"
+strip = "symbols"
