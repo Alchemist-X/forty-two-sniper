@@ -12,6 +12,7 @@ use tracing::{info, warn};
 use crate::{
     abi::{FTRouter, IERC20},
     config::Settings,
+    rate_limit::RpcRateLimiter,
 };
 
 pub async fn buy_market<P>(
@@ -20,6 +21,7 @@ pub async fn buy_market<P>(
     wallet_address: Address,
     market: Address,
     detected_at: Instant,
+    rpc_limiter: &RpcRateLimiter,
 ) -> Result<()>
 where
     P: Provider + Clone,
@@ -47,7 +49,8 @@ where
         .calldata()
         .to_owned();
 
-    let gas_price = bumped_gas_price(provider, settings.strategy.gas_price_bump_bps).await?;
+    let gas_price =
+        bumped_gas_price(provider, rpc_limiter, settings.strategy.gas_price_bump_bps).await?;
     let elapsed_ms = detected_at.elapsed().as_millis();
 
     if settings.strategy.dry_run {
@@ -64,22 +67,27 @@ where
 
     let tx = TransactionRequest::default()
         .with_to(router_address)
+        .with_chain_id(settings.rpc.chain_id)
         .with_input(calldata)
         .with_gas_limit(settings.strategy.gas_limit)
         .with_gas_price(gas_price);
 
+    rpc_limiter.wait().await;
     let pending = provider.send_transaction(tx).await?;
     let tx_hash = *pending.tx_hash();
     info!(%market, %tx_hash, elapsed_ms, "buy transaction submitted");
 
-    let receipt = pending.get_receipt().await?;
-    info!(
-        %market,
-        tx_hash = %receipt.transaction_hash,
-        block_number = ?receipt.block_number,
-        status = receipt.status(),
-        "buy transaction included"
-    );
+    if settings.strategy.wait_for_receipt {
+        rpc_limiter.wait().await;
+        let receipt = pending.get_receipt().await?;
+        info!(
+            %market,
+            tx_hash = %receipt.transaction_hash,
+            block_number = ?receipt.block_number,
+            status = receipt.status(),
+            "buy transaction included"
+        );
+    }
 
     Ok(())
 }
@@ -89,6 +97,7 @@ pub async fn approve_router<P>(
     settings: &Settings,
     wallet_address: Address,
     infinite: bool,
+    rpc_limiter: &RpcRateLimiter,
 ) -> Result<()>
 where
     P: Provider + Clone,
@@ -96,6 +105,7 @@ where
     let token = settings.collateral_address()?;
     let router = settings.router_address()?;
     let erc20 = IERC20::new(token, provider.clone());
+    rpc_limiter.wait().await;
     let allowance = erc20.allowance(wallet_address, router).call().await?;
 
     let amount = if infinite {
@@ -110,7 +120,8 @@ where
     }
 
     let calldata = erc20.approve(router, amount).calldata().to_owned();
-    let gas_price = bumped_gas_price(provider, settings.strategy.gas_price_bump_bps).await?;
+    let gas_price =
+        bumped_gas_price(provider, rpc_limiter, settings.strategy.gas_price_bump_bps).await?;
 
     if settings.strategy.dry_run {
         warn!(
@@ -125,14 +136,17 @@ where
 
     let tx = TransactionRequest::default()
         .with_to(token)
+        .with_chain_id(settings.rpc.chain_id)
         .with_input(calldata)
         .with_gas_limit(80_000)
         .with_gas_price(gas_price);
 
+    rpc_limiter.wait().await;
     let pending = provider.send_transaction(tx).await?;
     let tx_hash = *pending.tx_hash();
     info!(%tx_hash, "approve transaction submitted");
 
+    rpc_limiter.wait().await;
     let receipt = pending.get_receipt().await?;
     info!(
         tx_hash = %receipt.transaction_hash,
@@ -144,10 +158,15 @@ where
     Ok(())
 }
 
-async fn bumped_gas_price<P>(provider: &P, bump_bps: u64) -> Result<u128>
+async fn bumped_gas_price<P>(
+    provider: &P,
+    rpc_limiter: &RpcRateLimiter,
+    bump_bps: u64,
+) -> Result<u128>
 where
     P: Provider,
 {
+    rpc_limiter.wait().await;
     let gas_price = provider.get_gas_price().await?;
     Ok(gas_price.saturating_mul(10_000 + bump_bps as u128) / 10_000)
 }

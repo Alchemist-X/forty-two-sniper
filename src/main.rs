@@ -2,6 +2,7 @@ mod abi;
 mod config;
 mod execution;
 mod metadata;
+mod rate_limit;
 
 use std::{collections::HashSet, path::PathBuf, time::Instant};
 
@@ -17,6 +18,7 @@ use clap::{Parser, Subcommand};
 use config::Settings;
 use eyre::{Context, Result, eyre};
 use futures_util::StreamExt;
+use rate_limit::RpcRateLimiter;
 use tracing::{debug, error, info, warn};
 use url::Url;
 
@@ -71,6 +73,7 @@ async fn run(settings: Settings) -> Result<()> {
     let http_provider = ProviderBuilder::new()
         .wallet(signer)
         .connect_http(settings.rpc.http_url.parse::<Url>()?);
+    let rpc_limiter = RpcRateLimiter::new(settings.rpc.max_requests_per_second);
 
     let ws_provider = ProviderBuilder::new()
         .connect_ws(WsConnect::new(settings.rpc.ws_url.clone()))
@@ -87,6 +90,7 @@ async fn run(settings: Settings) -> Result<()> {
         router = %settings.router_address()?,
         wallet = %wallet_address,
         dry_run = settings.strategy.dry_run,
+        rpc_max_rps = settings.rpc.max_requests_per_second,
         "starting 42Space sniper"
     );
 
@@ -152,6 +156,7 @@ async fn run(settings: Settings) -> Result<()> {
                     wallet_address,
                     decoded.market,
                     received_at,
+                    &rpc_limiter,
                 )
                 .await
                 {
@@ -174,8 +179,9 @@ async fn approve(settings: Settings, infinite: bool) -> Result<()> {
     let provider = ProviderBuilder::new()
         .wallet(signer)
         .connect_http(settings.rpc.http_url.parse::<Url>()?);
+    let rpc_limiter = RpcRateLimiter::new(settings.rpc.max_requests_per_second);
 
-    execution::approve_router(&provider, &settings, wallet_address, infinite).await
+    execution::approve_router(&provider, &settings, wallet_address, infinite, &rpc_limiter).await
 }
 
 fn signer_from_env(settings: &Settings) -> Result<PrivateKeySigner> {

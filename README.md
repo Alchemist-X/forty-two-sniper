@@ -10,6 +10,7 @@ The implementation uses Rust, Tokio, and Alloy because the hot path is network I
 - Filters markets by collateral token.
 - Builds router calldata for `FTRouter.swapSimple`.
 - Applies a configurable legacy gas-price bump for BNB Chain.
+- Respects the configured QuickNode HTTP RPC budget, defaulting to 15 requests/second.
 - Provides an `approve` command for the BUSDT router allowance.
 - Defaults to `dry_run = true`.
 
@@ -25,6 +26,17 @@ cargo run --release -- run
 ```
 
 For real trading, replace the example RPC URLs with a paid low-latency BNB Chain endpoint near Tokyo and set `dry_run = false` only after testing with a dedicated wallet.
+
+## RPC Budget
+
+The default config assumes a QuickNode limit of `15` requests/second:
+
+```toml
+[rpc]
+max_requests_per_second = 15
+```
+
+The bot rate-limits explicit HTTP JSON-RPC calls before gas-price fetches, allowance reads, and transaction submissions. WebSocket event delivery is separate. Keep metadata fetches disabled on the hot path, and leave `wait_for_receipt = false` for live sniping so receipt polling does not compete with execution requests.
 
 ## Current 42 Addresses
 

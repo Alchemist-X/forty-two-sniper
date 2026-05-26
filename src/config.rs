@@ -21,6 +21,10 @@ pub struct Settings {
 pub struct RpcConfig {
     pub http_url: String,
     pub ws_url: String,
+    #[serde(default = "default_chain_id")]
+    pub chain_id: u64,
+    #[serde(default = "default_max_requests_per_second")]
+    pub max_requests_per_second: u32,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -52,6 +56,8 @@ pub struct StrategyConfig {
     pub gas_price_bump_bps: u64,
     #[serde(default = "default_true")]
     pub dry_run: bool,
+    #[serde(default)]
+    pub wait_for_receipt: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -101,6 +107,14 @@ impl Settings {
         }
         if self.rpc.ws_url.trim().is_empty() {
             return Err(eyre!("rpc.ws_url must not be empty"));
+        }
+        if self.rpc.chain_id == 0 {
+            return Err(eyre!("rpc.chain_id must be greater than zero"));
+        }
+        if self.rpc.max_requests_per_second == 0 {
+            return Err(eyre!(
+                "rpc.max_requests_per_second must be greater than zero"
+            ));
         }
         if self.strategy.gas_limit == 0 {
             return Err(eyre!("strategy.gas_limit must be greater than zero"));
@@ -164,6 +178,11 @@ impl Settings {
         }
         if let Ok(value) = std::env::var("SNIPER_WS_RPC_URL") {
             self.rpc.ws_url = value;
+        }
+        if let Ok(value) = std::env::var("SNIPER_MAX_REQUESTS_PER_SECOND")
+            && let Ok(parsed) = value.parse()
+        {
+            self.rpc.max_requests_per_second = parsed;
         }
         if let Ok(value) = std::env::var("SNIPER_BUY_AMOUNT_UNITS") {
             self.strategy.buy_amount_units = value;
@@ -243,6 +262,14 @@ fn redact_segment(segment: &str) -> String {
 
 fn default_private_key_env() -> String {
     "SNIPER_PRIVATE_KEY".to_owned()
+}
+
+fn default_chain_id() -> u64 {
+    56
+}
+
+fn default_max_requests_per_second() -> u32 {
+    15
 }
 
 fn default_token_id() -> String {

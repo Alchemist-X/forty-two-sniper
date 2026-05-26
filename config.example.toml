@@ -2,6 +2,8 @@
 # Use a paid low-latency Tokyo BNB Chain endpoint for real runs.
 http_url = "https://bsc-dataseed.bnbchain.org"
 ws_url = "wss://your-bnb-ws-endpoint.example"
+chain_id = 56
+max_requests_per_second = 15
 
 [wallet]
 private_key_env = "SNIPER_PRIVATE_KEY"
@@ -20,6 +22,7 @@ min_out_or_max_in = "0"
 gas_limit = 300000
 gas_price_bump_bps = 2000
 dry_run = true
+wait_for_receipt = false
 
 [metadata]
 enabled = false

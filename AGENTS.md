@@ -4,6 +4,7 @@ This project is latency-sensitive trading infrastructure. Treat performance over
 
 - Keep the hot path short: WebSocket log decode, filter, calldata build, sign, broadcast.
 - Do not add blocking I/O, synchronous DNS, REST metadata fetches, database writes, or heavy logging before transaction submission.
+- The current QuickNode endpoint budget is 15 requests/second. Keep HTTP RPC calls explicitly rate-limited and avoid receipt polling on the buy hot path unless intentionally enabled.
 - Prefer allocation-free or low-allocation code on the event path.
 - Measure p50, p95, and p99 latency for detection-to-broadcast changes.
 - Default to explicit configuration and fail-fast startup validation.
