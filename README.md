@@ -11,6 +11,7 @@ The implementation uses Rust, Tokio, and Alloy because the hot path is network I
 - Builds router calldata for `FTRouter.swapSimple`.
 - Applies a configurable legacy gas-price bump for BNB Chain.
 - Respects the configured QuickNode HTTP RPC budget, defaulting to 15 requests/second.
+- Computes sell quotes, slippage, fee/tax impact, and JSONL pricing logs outside the buy hot path.
 - Provides an `approve` command for the BUSDT router allowance.
 - Defaults to `dry_run = true`.
 
@@ -37,6 +38,16 @@ max_requests_per_second = 15
 ```
 
 The bot rate-limits explicit HTTP JSON-RPC calls before gas-price fetches, allowance reads, and transaction submissions. WebSocket event delivery is separate. Keep metadata fetches disabled on the hot path, and leave `wait_for_receipt = false` for live sniping so receipt polling does not compete with execution requests.
+
+## Pricing And Sell Quotes
+
+Pricing is designed for the sell service and post-buy analytics. The buy path sends first; post-buy sell-price samples run asynchronously afterward. Logs are written as JSONL to `logs/prices.jsonl`.
+
+```bash
+cargo run --release -- quote-sell 0xMarketAddress --amount-units 100
+```
+
+The sell guard defaults to `max_sell_slippage_bps = 5000`. If estimated slippage is above 50%, the quote is marked non-executable and the reason is recorded in the pricing log.
 
 ## Current 42 Addresses
 

@@ -2,13 +2,14 @@ mod abi;
 mod config;
 mod execution;
 mod metadata;
+mod price;
 mod rate_limit;
 
 use std::{collections::HashSet, path::PathBuf, time::Instant};
 
 use abi::FTMarketController;
 use alloy::{
-    primitives::Address,
+    primitives::{Address, U256},
     providers::{Provider, ProviderBuilder, WsConnect},
     rpc::types::{BlockNumberOrTag, Filter},
     signers::local::PrivateKeySigner,
@@ -44,6 +45,16 @@ enum Command {
     },
     /// Validate and print the resolved configuration without starting the bot.
     CheckConfig,
+    /// Compute a sell quote and write the pricing decision log.
+    QuoteSell {
+        market: String,
+        /// Human-readable OT amount. If omitted, quote the configured wallet balance.
+        #[arg(long)]
+        amount_units: Option<String>,
+        /// Wallet to inspect when amount-units is omitted. Defaults to SNIPER_PRIVATE_KEY address.
+        #[arg(long)]
+        wallet: Option<String>,
+    },
 }
 
 #[tokio::main]
@@ -61,6 +72,19 @@ async fn main() -> Result<()> {
             settings.validate()?;
             println!("{:#?}", settings.redacted_for_display());
             Ok(())
+        }
+        Command::QuoteSell {
+            market,
+            amount_units,
+            wallet,
+        } => {
+            quote_sell(
+                settings,
+                &market,
+                amount_units.as_deref(),
+                wallet.as_deref(),
+            )
+            .await
         }
     }
 }
@@ -161,6 +185,14 @@ async fn run(settings: Settings) -> Result<()> {
                 .await
                 {
                     error!(market = %decoded.market, ?err, "buy path failed");
+                } else {
+                    price::spawn_post_buy_sampler(
+                        http_provider.clone(),
+                        settings.clone(),
+                        wallet_address,
+                        decoded.market,
+                        rpc_limiter.clone(),
+                    );
                 }
             }
             signal = tokio::signal::ctrl_c() => {
@@ -182,6 +214,91 @@ async fn approve(settings: Settings, infinite: bool) -> Result<()> {
     let rpc_limiter = RpcRateLimiter::new(settings.rpc.max_requests_per_second);
 
     execution::approve_router(&provider, &settings, wallet_address, infinite, &rpc_limiter).await
+}
+
+async fn quote_sell(
+    settings: Settings,
+    market: &str,
+    amount_units: Option<&str>,
+    wallet: Option<&str>,
+) -> Result<()> {
+    settings.validate()?;
+    let market = market
+        .parse::<Address>()
+        .wrap_err("failed to parse market")?;
+    let provider = ProviderBuilder::new().connect_http(settings.rpc.http_url.parse::<Url>()?);
+    let rpc_limiter = RpcRateLimiter::new(settings.rpc.max_requests_per_second);
+    let engine = price::PriceEngine::new(provider, settings.clone(), rpc_limiter);
+    let token_id = settings.outcome_token_id()?;
+
+    let amount = if let Some(amount_units) = amount_units {
+        let decimals = read_ot_decimals(&settings, market, token_id).await?;
+        price::SellAmount::Exact(settings.parse_units("amount_units", amount_units, decimals)?)
+    } else {
+        let wallet = match wallet {
+            Some(wallet) => wallet
+                .parse::<Address>()
+                .wrap_err("failed to parse wallet")?,
+            None => signer_from_env(&settings)?.address(),
+        };
+        price::SellAmount::WalletBalance(wallet)
+    };
+
+    let quote = engine.quote_sell_exact_ot(market, token_id, amount).await?;
+    engine.log_sell_quote("quote_sell", None, &quote).await?;
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&quote_for_display(&quote))?
+    );
+
+    if quote.executable {
+        info!(
+            market = %market,
+            token_id = %token_id,
+            slippage_bps = quote.slippage_bps,
+            protocol_tax_bps = quote.protocol_tax_bps,
+            "sell quote executable"
+        );
+    } else {
+        warn!(
+            market = %market,
+            token_id = %token_id,
+            slippage_bps = quote.slippage_bps,
+            reason = %quote.reason,
+            "sell quote blocked"
+        );
+    }
+
+    Ok(())
+}
+
+async fn read_ot_decimals(settings: &Settings, market: Address, token_id: U256) -> Result<u8> {
+    use crate::abi::FTMarket;
+    let provider = ProviderBuilder::new().connect_http(settings.rpc.http_url.parse::<Url>()?);
+    let rpc_limiter = RpcRateLimiter::new(settings.rpc.max_requests_per_second);
+    let market_contract = FTMarket::new(market, provider);
+    rpc_limiter.wait().await;
+    Ok(market_contract.decimals(token_id).call().await?)
+}
+
+fn quote_for_display(quote: &price::SellQuote) -> serde_json::Value {
+    serde_json::json!({
+        "market": quote.market.to_string(),
+        "token_id": quote.token_id.to_string(),
+        "ot_decimals": quote.ot_decimals,
+        "ot_amount": quote.ot_amount.to_string(),
+        "spot_collateral_value": quote.spot_collateral_value.to_string(),
+        "collateral_to_user": quote.collateral_to_user.to_string(),
+        "collateral_to_treasury": quote.collateral_to_treasury.to_string(),
+        "extra_sell_tax": quote.extra_sell_tax.to_string(),
+        "estimated_net_to_user": quote.estimated_net_to_user.to_string(),
+        "slippage_bps": quote.slippage_bps,
+        "protocol_tax_bps": quote.protocol_tax_bps,
+        "extra_tax_bps": quote.extra_tax_bps,
+        "effective_loss_bps": quote.effective_loss_bps,
+        "executable": quote.executable,
+        "reason": quote.reason,
+    })
 }
 
 fn signer_from_env(settings: &Settings) -> Result<PrivateKeySigner> {

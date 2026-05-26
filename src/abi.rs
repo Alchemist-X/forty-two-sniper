@@ -48,6 +48,37 @@ sol! {
 
     #[allow(missing_docs)]
     #[sol(rpc)]
+    contract FTMarket {
+        struct MarketDeployParams {
+            address collateral;
+            uint256 parentTokenId;
+            bytes32 questionId;
+            address curve;
+            uint128 timestampStart;
+        }
+
+        function balanceOf(address owner, uint256 id) external view returns (uint256);
+        function totalSupply(uint256 id) external view returns (uint256);
+        function decimals(uint256 id) external view returns (uint8);
+        function totalMarketCap() external view returns (uint256);
+        function readMarketDeployParams() external view returns (MarketDeployParams params);
+    }
+
+    #[allow(missing_docs)]
+    #[sol(rpc)]
+    contract FTCurve {
+        function calMarginalPrice(address market, uint256 tokenId) external view returns (uint256 price);
+        function simMarginalPrice(uint256 otSupply) external view returns (uint256 price);
+        function calRedeemValueByOtDelta(address market, uint256 tokenId, uint256 otDelta, bytes dataSwap)
+            external
+            returns (uint256 collateralToUser, uint256 collateralToTreasury);
+        function calMintCostByOtDelta(address market, uint256 tokenId, uint256 otDelta, bytes dataSwap)
+            external
+            returns (uint256 collateralFromUser, uint256 collateralToTreasury);
+    }
+
+    #[allow(missing_docs)]
+    #[sol(rpc)]
     contract IERC20 {
         function approve(address spender, uint256 amount) external returns (bool);
         function allowance(address owner, address spender) external view returns (uint256);

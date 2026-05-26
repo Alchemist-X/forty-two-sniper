@@ -12,6 +12,8 @@ pub struct Settings {
     pub contracts: ContractConfig,
     pub strategy: StrategyConfig,
     #[serde(default)]
+    pub pricing: PricingConfig,
+    #[serde(default)]
     pub metadata: MetadataConfig,
     #[serde(default)]
     pub filters: FilterConfig,
@@ -61,6 +63,20 @@ pub struct StrategyConfig {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PricingConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default = "default_price_log_path")]
+    pub log_path: String,
+    #[serde(default = "default_max_sell_slippage_bps")]
+    pub max_sell_slippage_bps: u64,
+    #[serde(default)]
+    pub extra_sell_tax_bps: u64,
+    #[serde(default = "default_sample_offsets_ms")]
+    pub sample_offsets_ms: Vec<u64>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct MetadataConfig {
     #[serde(default)]
     pub enabled: bool,
@@ -82,6 +98,18 @@ impl Default for MetadataConfig {
             enabled: false,
             rest_base_url: default_rest_base_url(),
             timeout_ms: default_metadata_timeout_ms(),
+        }
+    }
+}
+
+impl Default for PricingConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            log_path: default_price_log_path(),
+            max_sell_slippage_bps: default_max_sell_slippage_bps(),
+            extra_sell_tax_bps: 0,
+            sample_offsets_ms: default_sample_offsets_ms(),
         }
     }
 }
@@ -118,6 +146,16 @@ impl Settings {
         }
         if self.strategy.gas_limit == 0 {
             return Err(eyre!("strategy.gas_limit must be greater than zero"));
+        }
+        if self.pricing.max_sell_slippage_bps > 10_000 {
+            return Err(eyre!(
+                "pricing.max_sell_slippage_bps must be less than or equal to 10000"
+            ));
+        }
+        if self.pricing.extra_sell_tax_bps > 10_000 {
+            return Err(eyre!(
+                "pricing.extra_sell_tax_bps must be less than or equal to 10000"
+            ));
         }
         Ok(())
     }
@@ -160,6 +198,10 @@ impl Settings {
         )
     }
 
+    pub fn parse_units(&self, field: &str, value: &str, decimals: u8) -> Result<U256> {
+        parse_token_units(field, value, decimals)
+    }
+
     pub fn is_allowed_collateral(&self, collateral: Address) -> bool {
         if self.filters.allowed_collateral.is_empty() {
             return collateral == self.collateral_address().unwrap_or_default();
@@ -189,6 +231,9 @@ impl Settings {
         }
         if let Ok(value) = std::env::var("SNIPER_DRY_RUN") {
             self.strategy.dry_run = matches!(value.as_str(), "1" | "true" | "TRUE" | "yes" | "YES");
+        }
+        if let Ok(value) = std::env::var("SNIPER_PRICE_LOG_PATH") {
+            self.pricing.log_path = value;
         }
     }
 }
@@ -294,6 +339,18 @@ fn default_gas_bump_bps() -> u64 {
 
 fn default_true() -> bool {
     true
+}
+
+fn default_price_log_path() -> String {
+    "logs/prices.jsonl".to_owned()
+}
+
+fn default_max_sell_slippage_bps() -> u64 {
+    5_000
+}
+
+fn default_sample_offsets_ms() -> Vec<u64> {
+    vec![0, 10_000, 60_000]
 }
 
 fn default_rest_base_url() -> String {

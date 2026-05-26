@@ -24,6 +24,13 @@ gas_price_bump_bps = 2000
 dry_run = true
 wait_for_receipt = false
 
+[pricing]
+enabled = true
+log_path = "logs/prices.jsonl"
+max_sell_slippage_bps = 5000
+extra_sell_tax_bps = 0
+sample_offsets_ms = [0, 10000, 60000]
+
 [metadata]
 enabled = false
 rest_base_url = "https://rest.ft.42.space/api/v1"
