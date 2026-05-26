@@ -49,6 +49,26 @@ cargo run --release -- quote-sell 0xMarketAddress --amount-units 100
 
 The sell guard defaults to `max_sell_slippage_bps = 5000`. If estimated slippage is above 50%, the quote is marked non-executable and the reason is recorded in the pricing log.
 
+To validate pricing against historical chain data:
+
+```bash
+cargo run --release -- validate-pricing --samples 100 \
+  --scan-rpc-url https://bsc-rpc.publicnode.com
+```
+
+The validator pulls high-volume 42Space market addresses from the REST API, scans historical `RedeemSwap` logs for those addresses, replays each sell quote at `block_number - 1`, compares computed collateral outputs against the actual event fields, and writes JSONL results to `logs/pricing-validation.jsonl`.
+
+Historical replay defaults to `tolerance-wei = 100000000000000` because the replay uses the previous block state while the real swap used the execution block timestamp; on 18-decimal collateral this tolerance is `0.0001` token units.
+
+QuickNode Discover currently limits `eth_getLogs` to very small block ranges. Use `--scan-rpc-url` with a log-friendly endpoint for offline validation while keeping the configured low-latency QuickNode endpoint for quote replay and live execution.
+If a public scan endpoint rate-limits, lower `--scan-max-requests-per-second`; this does not change the live QuickNode execution budget in `config.toml`.
+
+To re-check existing JSONL validation logs without any RPC calls:
+
+```bash
+cargo run --release -- validate-pricing-log logs/pricing-validation-100.jsonl
+```
+
 ## Current 42 Addresses
 
 These defaults are from the official 42 Deployments page checked on 2026-05-26:

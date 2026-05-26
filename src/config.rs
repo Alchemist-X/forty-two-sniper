@@ -379,8 +379,7 @@ mod tests {
 
     #[test]
     fn redacts_rpc_url_path_tokens() {
-        let redacted =
-            redact_url("https://example.quiknode.pro/9c2d108bc3e3e72a415759f317f9e050bd04c311/");
-        assert_eq!(redacted, "https://example.quiknode.pro/9c2d...c311/");
+        let redacted = redact_url("https://rpc.example.test/abcdef0123456789abcdef0123456789/");
+        assert_eq!(redacted, "https://rpc.example.test/abcd...6789/");
     }
 }

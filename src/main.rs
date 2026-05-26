@@ -4,6 +4,7 @@ mod execution;
 mod metadata;
 mod price;
 mod rate_limit;
+mod validation;
 
 use std::{collections::HashSet, path::PathBuf, time::Instant};
 
@@ -15,7 +16,7 @@ use alloy::{
     signers::local::PrivateKeySigner,
     sol_types::SolEvent,
 };
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 use config::Settings;
 use eyre::{Context, Result, eyre};
 use futures_util::StreamExt;
@@ -55,6 +56,55 @@ enum Command {
         #[arg(long)]
         wallet: Option<String>,
     },
+    /// Replay historical RedeemSwap logs against block-1 quotes.
+    ValidatePricing(ValidatePricingArgs),
+    /// Validate existing pricing validation JSONL logs without RPC calls.
+    ValidatePricingLog(ValidatePricingLogArgs),
+}
+
+#[derive(Debug, Args)]
+struct ValidatePricingArgs {
+    #[arg(long, default_value_t = 100)]
+    samples: usize,
+    #[arg(long, default_value_t = 2_000_000)]
+    lookback_blocks: u64,
+    #[arg(long, default_value_t = 50_000)]
+    chunk_size: u64,
+    #[arg(long, default_value = "100000000000000")]
+    tolerance_wei: String,
+    #[arg(long, default_value = "logs/pricing-validation.jsonl")]
+    output_path: String,
+    /// Optional RPC URL used only for historical eth_getLogs scans.
+    #[arg(long)]
+    scan_rpc_url: Option<String>,
+    /// Number of recent 42Space markets to use as log addresses.
+    #[arg(long, default_value_t = 400)]
+    market_limit: usize,
+    /// Offset into the 42Space REST market list.
+    #[arg(long, default_value_t = 0)]
+    market_offset: usize,
+    /// Number of market addresses per eth_getLogs request.
+    #[arg(long, default_value_t = 5)]
+    market_batch_size: usize,
+    /// Request budget for the offline historical log scan RPC.
+    #[arg(long, default_value_t = 5)]
+    scan_max_requests_per_second: u32,
+    /// REST market ordering used to pick likely active sample sources.
+    #[arg(long, default_value = "volume")]
+    market_order: String,
+    /// Optional REST market status filter, for example live, ended, resolved, finalised.
+    #[arg(long)]
+    market_status: Option<String>,
+}
+
+#[derive(Debug, Args)]
+struct ValidatePricingLogArgs {
+    /// One or more JSONL files produced by validate-pricing.
+    #[arg(required = true)]
+    input: Vec<PathBuf>,
+    /// Maximum tolerated diff in wei for user and treasury outputs.
+    #[arg(long, default_value = "100000000000000")]
+    tolerance_wei: String,
 }
 
 #[tokio::main]
@@ -86,6 +136,8 @@ async fn main() -> Result<()> {
             )
             .await
         }
+        Command::ValidatePricing(args) => validate_pricing(settings, args).await,
+        Command::ValidatePricingLog(args) => validate_pricing_log(args).await,
     }
 }
 
@@ -279,6 +331,90 @@ async fn read_ot_decimals(settings: &Settings, market: Address, token_id: U256) 
     let market_contract = FTMarket::new(market, provider);
     rpc_limiter.wait().await;
     Ok(market_contract.decimals(token_id).call().await?)
+}
+
+async fn validate_pricing(settings: Settings, args: ValidatePricingArgs) -> Result<()> {
+    settings.validate()?;
+    let tolerance_wei =
+        U256::from_str_radix(&args.tolerance_wei, 10).wrap_err("failed to parse tolerance-wei")?;
+    let quote_provider = ProviderBuilder::new().connect_http(settings.rpc.http_url.parse::<Url>()?);
+    let scan_url = args
+        .scan_rpc_url
+        .as_deref()
+        .unwrap_or(&settings.rpc.http_url);
+    let scan_provider = ProviderBuilder::new().connect_http(scan_url.parse::<Url>()?);
+    let quote_limiter = RpcRateLimiter::new(settings.rpc.max_requests_per_second);
+    let scan_limiter = RpcRateLimiter::new(args.scan_max_requests_per_second);
+    let summary = validation::validate_pricing(
+        quote_provider,
+        scan_provider,
+        settings,
+        quote_limiter,
+        scan_limiter,
+        validation::ValidationOptions {
+            samples: args.samples,
+            lookback_blocks: args.lookback_blocks,
+            chunk_size: args.chunk_size,
+            tolerance_wei,
+            output_path: args.output_path,
+            market_limit: args.market_limit,
+            market_offset: args.market_offset,
+            market_batch_size: args.market_batch_size,
+            market_order: args.market_order,
+            market_status: args.market_status,
+        },
+    )
+    .await?;
+
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&serde_json::json!({
+            "requested_samples": summary.requested_samples,
+            "collected_candidates": summary.collected_candidates,
+            "validated": summary.validated,
+            "passed": summary.passed,
+            "failed": summary.failed,
+            "skipped": summary.skipped,
+            "max_abs_user_diff": summary.max_abs_user_diff.to_string(),
+            "max_abs_treasury_diff": summary.max_abs_treasury_diff.to_string(),
+            "elapsed_ms": summary.elapsed_ms,
+            "output_path": summary.output_path,
+        }))?
+    );
+
+    if summary.failed > 0 {
+        return Err(eyre!(
+            "pricing validation found {} failed samples",
+            summary.failed
+        ));
+    }
+    if summary.validated < args.samples {
+        warn!(
+            requested = args.samples,
+            validated = summary.validated,
+            skipped = summary.skipped,
+            "pricing validation completed with fewer validated samples than requested"
+        );
+    }
+
+    Ok(())
+}
+
+async fn validate_pricing_log(args: ValidatePricingLogArgs) -> Result<()> {
+    let tolerance_wei =
+        U256::from_str_radix(&args.tolerance_wei, 10).wrap_err("failed to parse tolerance-wei")?;
+    let summary = validation::validate_pricing_logs(&args.input, tolerance_wei).await?;
+
+    println!("{}", serde_json::to_string_pretty(&summary)?);
+
+    if summary.failed > 0 {
+        return Err(eyre!(
+            "pricing log validation found {} failed samples",
+            summary.failed
+        ));
+    }
+
+    Ok(())
 }
 
 fn quote_for_display(quote: &price::SellQuote) -> serde_json::Value {

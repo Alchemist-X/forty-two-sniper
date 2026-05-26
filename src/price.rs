@@ -4,6 +4,7 @@ use std::{
 };
 
 use alloy::{
+    eips::BlockId,
     primitives::{Address, Bytes, U256},
     providers::Provider,
 };
@@ -72,16 +73,43 @@ where
         token_id: U256,
         amount: SellAmount,
     ) -> Result<SellQuote> {
+        self.quote_sell_exact_ot_at_block(market, token_id, amount, None)
+            .await
+    }
+
+    pub async fn quote_sell_exact_ot_at_block(
+        &self,
+        market: Address,
+        token_id: U256,
+        amount: SellAmount,
+        block_number: Option<u64>,
+    ) -> Result<SellQuote> {
         let market_contract = FTMarket::new(market, self.provider.clone());
 
         self.rpc_limiter.wait().await;
-        let decimals = market_contract.decimals(token_id).call().await?;
+        let decimals_call = market_contract.decimals(token_id);
+        let decimals = if let Some(block_number) = block_number {
+            decimals_call
+                .block(BlockId::number(block_number))
+                .call()
+                .await?
+        } else {
+            decimals_call.call().await?
+        };
 
         let ot_amount = match amount {
             SellAmount::Exact(amount) => amount,
             SellAmount::WalletBalance(wallet) => {
                 self.rpc_limiter.wait().await;
-                market_contract.balanceOf(wallet, token_id).call().await?
+                let balance_call = market_contract.balanceOf(wallet, token_id);
+                if let Some(block_number) = block_number {
+                    balance_call
+                        .block(BlockId::number(block_number))
+                        .call()
+                        .await?
+                } else {
+                    balance_call.call().await?
+                }
             }
         };
 
@@ -90,29 +118,66 @@ where
         }
 
         self.rpc_limiter.wait().await;
-        let deploy = market_contract.readMarketDeployParams().call().await?;
+        let deploy_call = market_contract.readMarketDeployParams();
+        let deploy = if let Some(block_number) = block_number {
+            deploy_call
+                .block(BlockId::number(block_number))
+                .call()
+                .await?
+        } else {
+            deploy_call.call().await?
+        };
         let curve_address = deploy.curve;
         let curve = FTCurve::new(curve_address, self.provider.clone());
 
         self.rpc_limiter.wait().await;
-        let pre_supply = market_contract.totalSupply(token_id).call().await?;
+        let supply_call = market_contract.totalSupply(token_id);
+        let pre_supply = if let Some(block_number) = block_number {
+            supply_call
+                .block(BlockId::number(block_number))
+                .call()
+                .await?
+        } else {
+            supply_call.call().await?
+        };
 
         if ot_amount > pre_supply {
             return Err(eyre!("OT amount exceeds current token supply"));
         }
 
         self.rpc_limiter.wait().await;
-        let pre_marginal_price = curve.calMarginalPrice(market, token_id).call().await?;
+        let pre_price_call = curve.calMarginalPrice(market, token_id);
+        let pre_marginal_price = if let Some(block_number) = block_number {
+            pre_price_call
+                .block(BlockId::number(block_number))
+                .call()
+                .await?
+        } else {
+            pre_price_call.call().await?
+        };
 
         self.rpc_limiter.wait().await;
-        let redeem_quote = curve
-            .calRedeemValueByOtDelta(market, token_id, ot_amount, Bytes::new())
-            .call()
-            .await?;
+        let redeem_call = curve.calRedeemValueByOtDelta(market, token_id, ot_amount, Bytes::new());
+        let redeem_quote = if let Some(block_number) = block_number {
+            redeem_call
+                .block(BlockId::number(block_number))
+                .call()
+                .await?
+        } else {
+            redeem_call.call().await?
+        };
 
         let post_supply = pre_supply - ot_amount;
         self.rpc_limiter.wait().await;
-        let post_marginal_price = curve.simMarginalPrice(post_supply).call().await?;
+        let post_price_call = curve.simMarginalPrice(post_supply);
+        let post_marginal_price = if let Some(block_number) = block_number {
+            post_price_call
+                .block(BlockId::number(block_number))
+                .call()
+                .await?
+        } else {
+            post_price_call.call().await?
+        };
 
         let scale = pow10(decimals);
         let spot_collateral_value = checked_mul_div(ot_amount, pre_marginal_price, scale);
@@ -289,7 +354,7 @@ pub fn spawn_post_buy_sampler<P>(
     });
 }
 
-async fn append_jsonl(path: &str, record: &serde_json::Value) -> Result<()> {
+pub async fn append_jsonl(path: &str, record: &serde_json::Value) -> Result<()> {
     if let Some(parent) = Path::new(path).parent()
         && !parent.as_os_str().is_empty()
     {
@@ -357,6 +422,16 @@ mod tests {
         assert_eq!(loss_bps(U256::from(100), U256::from(75)), 2_500);
         assert_eq!(loss_bps(U256::from(100), U256::from(100)), 0);
         assert_eq!(loss_bps(U256::from(100), U256::from(110)), 0);
+    }
+
+    #[test]
+    fn computes_protocol_tax_bps() {
+        assert_eq!(ratio_bps(U256::from(8), U256::from(1_000)), 80);
+    }
+
+    #[test]
+    fn computes_effective_loss_after_tax() {
+        assert_eq!(loss_bps(U256::from(1_000), U256::from(920)), 800);
     }
 
     #[test]

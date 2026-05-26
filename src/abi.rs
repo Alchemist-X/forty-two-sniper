@@ -49,6 +49,24 @@ sol! {
     #[allow(missing_docs)]
     #[sol(rpc)]
     contract FTMarket {
+        event MintSwap(
+            address indexed caller,
+            address indexed receiver,
+            uint256 indexed tokenId,
+            uint256 collateralFromUser,
+            uint256 otToUser,
+            uint256 collateralToTreasury
+        );
+
+        event RedeemSwap(
+            address indexed caller,
+            address indexed receiver,
+            uint256 indexed tokenId,
+            uint256 collateralToUser,
+            uint256 otToPool,
+            uint256 collateralToTreasury
+        );
+
         struct MarketDeployParams {
             address collateral;
             uint256 parentTokenId;
