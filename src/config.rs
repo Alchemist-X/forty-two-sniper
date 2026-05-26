@@ -3,6 +3,7 @@ use std::{fs, path::Path, str::FromStr};
 use alloy::primitives::{Address, U256};
 use eyre::{Result, eyre};
 use serde::{Deserialize, Serialize};
+use url::Url;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Settings {
@@ -107,6 +108,13 @@ impl Settings {
         Ok(())
     }
 
+    pub fn redacted_for_display(&self) -> Self {
+        let mut settings = self.clone();
+        settings.rpc.http_url = redact_url(&settings.rpc.http_url);
+        settings.rpc.ws_url = redact_url(&settings.rpc.ws_url);
+        settings
+    }
+
     pub fn controller_address(&self) -> Result<Address> {
         parse_address("contracts.controller", &self.contracts.controller)
     }
@@ -208,6 +216,31 @@ fn parse_token_units(field: &str, value: &str, decimals: u8) -> Result<U256> {
     parse_u256(field, &normalized)
 }
 
+fn redact_url(value: &str) -> String {
+    let Ok(mut url) = Url::parse(value) else {
+        return redact_segment(value);
+    };
+
+    let Some(segments) = url.path_segments() else {
+        return url.to_string();
+    };
+
+    let redacted_segments = segments.map(redact_segment).collect::<Vec<_>>();
+    url.set_path(&redacted_segments.join("/"));
+    url.to_string()
+}
+
+fn redact_segment(segment: &str) -> String {
+    if segment.is_empty() {
+        return String::new();
+    }
+    if segment.len() < 16 {
+        return "***".to_owned();
+    }
+
+    format!("{}...{}", &segment[..4], &segment[segment.len() - 4..])
+}
+
 fn default_private_key_env() -> String {
     "SNIPER_PRIVATE_KEY".to_owned()
 }
@@ -258,5 +291,12 @@ mod tests {
     fn rejects_excess_precision() {
         let err = parse_token_units("x", "1.123", 2).unwrap_err();
         assert!(err.to_string().contains("more precision"));
+    }
+
+    #[test]
+    fn redacts_rpc_url_path_tokens() {
+        let redacted =
+            redact_url("https://example.quiknode.pro/9c2d108bc3e3e72a415759f317f9e050bd04c311/");
+        assert_eq!(redacted, "https://example.quiknode.pro/9c2d...c311/");
     }
 }

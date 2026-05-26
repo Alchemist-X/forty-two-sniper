@@ -57,7 +57,7 @@ async fn main() -> Result<()> {
         Command::Approve { infinite } => approve(settings, infinite).await,
         Command::CheckConfig => {
             settings.validate()?;
-            println!("{settings:#?}");
+            println!("{:#?}", settings.redacted_for_display());
             Ok(())
         }
     }
