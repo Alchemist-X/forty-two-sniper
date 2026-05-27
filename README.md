@@ -69,7 +69,7 @@ To re-check existing JSONL validation logs without any RPC calls:
 cargo run --release -- validate-pricing-log logs/pricing-validation-100.jsonl
 ```
 
-The interactive formula explainer is available at `docs/pricing-formulas.html`.
+The interactive trade simulation explainer is available at `docs/pricing-formulas.html`. It walks through market creation, inferred initial liquidity, buy execution, later market movement, and sell recovery with confirmed versus inferred data labels.
 
 ## Current 42 Addresses
 

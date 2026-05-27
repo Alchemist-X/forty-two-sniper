@@ -3,20 +3,24 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>42Space Pricing Formula Lab</title>
+  <title>42Space Trade Simulation</title>
   <style>
     :root {
       color-scheme: light;
-      --bg: #f6f7f4;
-      --ink: #18211f;
-      --muted: #63716c;
-      --line: #d9dfd8;
+      --bg: #f5f6f3;
       --panel: #ffffff;
+      --ink: #18211f;
+      --muted: #66736e;
+      --line: #dce2dc;
       --green: #176b4d;
-      --blue: #2563a8;
-      --amber: #b26b00;
+      --blue: #245f9f;
+      --amber: #9d6400;
       --red: #a23a32;
-      --shadow: 0 10px 28px rgba(24, 33, 31, 0.08);
+      --soft-green: #edf7f1;
+      --soft-blue: #edf4fb;
+      --soft-amber: #fff6e7;
+      --soft-red: #fbefee;
+      --shadow: 0 12px 30px rgba(24, 33, 31, 0.07);
     }
 
     * {
@@ -31,82 +35,183 @@
       line-height: 1.45;
     }
 
+    button,
+    input {
+      font: inherit;
+    }
+
     main {
-      min-height: 100vh;
+      max-width: 1360px;
+      margin: 0 auto;
+      padding: 22px;
+    }
+
+    .shell {
       display: grid;
-      grid-template-columns: 360px minmax(0, 1fr);
+      grid-template-columns: minmax(300px, 0.7fr) minmax(0, 1.3fr);
+      gap: 18px;
+      align-items: start;
     }
 
-    aside {
-      border-right: 1px solid var(--line);
-      background: #fbfcfa;
-      padding: 24px;
-      overflow: auto;
+    header {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(260px, 360px);
+      gap: 18px;
+      align-items: end;
+      padding: 10px 0 4px;
     }
 
-    .workspace {
-      padding: 24px;
-      overflow: auto;
+    h1,
+    h2,
+    h3,
+    p {
+      margin: 0;
     }
 
     h1 {
-      margin: 0 0 6px;
-      font-size: 24px;
-      line-height: 1.15;
+      max-width: 760px;
+      font-size: 30px;
+      line-height: 1.12;
       letter-spacing: 0;
     }
 
     h2 {
-      margin: 0 0 12px;
-      font-size: 17px;
+      font-size: 18px;
+      line-height: 1.25;
       letter-spacing: 0;
     }
 
     h3 {
-      margin: 0 0 8px;
       font-size: 14px;
+      line-height: 1.3;
       letter-spacing: 0;
     }
 
-    p {
-      margin: 0;
+    p,
+    li {
       color: var(--muted);
-    }
-
-    .lead {
-      margin-bottom: 20px;
       font-size: 14px;
     }
 
-    .controls {
+    .lead {
+      max-width: 760px;
+      margin-top: 10px;
+      font-size: 15px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      min-width: 0;
+    }
+
+    .pad {
+      padding: 16px;
+    }
+
+    .stack {
       display: grid;
-      gap: 16px;
+      gap: 14px;
+    }
+
+    .source-card {
+      padding: 14px;
+      background: #fbfcfa;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .source-card code,
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    .source-card code {
+      display: block;
+      color: var(--ink);
+      font-size: 12px;
+      overflow-wrap: anywhere;
+      white-space: normal;
+    }
+
+    .badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      padding: 3px 8px;
+      background: #fff;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .badge.confirmed {
+      color: var(--green);
+      border-color: #b9d9c8;
+      background: var(--soft-green);
+    }
+
+    .badge.inferred {
+      color: var(--amber);
+      border-color: #efd096;
+      background: var(--soft-amber);
+    }
+
+    .badge.unknown {
+      color: var(--red);
+      border-color: #edc2bd;
+      background: var(--soft-red);
+    }
+
+    .controls {
+      position: sticky;
+      top: 14px;
+      display: grid;
+      gap: 12px;
     }
 
     .control {
       display: grid;
       gap: 8px;
-      padding: 12px 0;
+      padding-top: 12px;
       border-top: 1px solid var(--line);
+    }
+
+    .control:first-of-type {
+      border-top: 0;
+      padding-top: 0;
     }
 
     .label-row {
       display: flex;
-      align-items: baseline;
       justify-content: space-between;
+      align-items: baseline;
       gap: 12px;
       min-width: 0;
     }
 
     label {
       font-size: 13px;
-      font-weight: 650;
+      font-weight: 700;
     }
 
     output {
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 12px;
       color: var(--blue);
+      font-size: 12px;
       white-space: nowrap;
     }
 
@@ -115,285 +220,211 @@
       accent-color: var(--green);
     }
 
-    .segmented {
+    .stage-tabs {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 6px;
-      margin-top: 6px;
+      padding: 10px;
+      border-bottom: 1px solid var(--line);
     }
 
-    button {
-      min-height: 34px;
+    .stage-tabs button {
+      min-height: 38px;
       border: 1px solid var(--line);
       border-radius: 6px;
       background: #fff;
       color: var(--ink);
-      font: inherit;
-      font-size: 13px;
       cursor: pointer;
-    }
-
-    button.active {
-      border-color: var(--green);
-      background: #eaf5ef;
-      color: var(--green);
-      font-weight: 700;
-    }
-
-    .top-grid {
-      display: grid;
-      grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
-      gap: 18px;
-      align-items: stretch;
-      margin-bottom: 18px;
-    }
-
-    .panel {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      box-shadow: var(--shadow);
-      padding: 18px;
-    }
-
-    .canvas-wrap {
-      min-height: 350px;
-      display: grid;
-      grid-template-rows: auto minmax(260px, 1fr);
-      gap: 12px;
-    }
-
-    canvas {
-      width: 100%;
-      height: 100%;
-      min-height: 260px;
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      background: linear-gradient(180deg, #fff 0%, #fbfcfa 100%);
-    }
-
-    .metrics {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
-    }
-
-    .decision-board {
-      display: grid;
-      grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
-      gap: 18px;
-      margin-bottom: 18px;
-    }
-
-    .cashflow {
-      display: grid;
-      gap: 10px;
-    }
-
-    .cash-row {
-      display: grid;
-      grid-template-columns: 122px minmax(0, 1fr) 120px;
-      align-items: center;
-      gap: 10px;
-      min-height: 42px;
-      border-bottom: 1px solid var(--line);
       font-size: 13px;
     }
 
-    .cash-row:last-child {
-      border-bottom: 0;
-    }
-
-    .cash-row b {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 13px;
-      text-align: right;
-      overflow-wrap: anywhere;
-    }
-
-    .minus {
-      color: var(--red);
-    }
-
-    .plus {
+    .stage-tabs button.active {
+      border-color: #9fcbb4;
+      background: var(--soft-green);
       color: var(--green);
-    }
-
-    .plain-ledger {
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: #fff;
-      padding: 14px;
-      margin-bottom: 18px;
-      display: grid;
-      gap: 10px;
-    }
-
-    .plain-ledger h2 {
-      margin-bottom: 2px;
-    }
-
-    .ledger-line {
-      display: grid;
-      grid-template-columns: 28px minmax(0, 1fr) minmax(150px, 0.35fr);
-      align-items: center;
-      gap: 12px;
-      min-height: 40px;
-      border-top: 1px solid var(--line);
-      padding-top: 10px;
-    }
-
-    .ledger-line:first-of-type {
-      border-top: 0;
-      padding-top: 0;
-    }
-
-    .ledger-line span {
-      display: inline-flex;
-      width: 28px;
-      height: 28px;
-      align-items: center;
-      justify-content: center;
-      border-radius: 50%;
-      background: #eaf5ef;
-      color: var(--green);
-      font-size: 12px;
       font-weight: 750;
     }
 
-    .ledger-line p {
-      color: var(--ink);
-      font-size: 14px;
-      font-weight: 650;
+    .simulation {
+      display: grid;
+      gap: 14px;
+      padding: 16px;
     }
 
-    .ledger-line b {
+    .stage-focus {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(260px, 0.95fr);
+      gap: 14px;
+      align-items: stretch;
+    }
+
+    .statement {
+      min-height: 190px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      background: #fbfcfa;
+      display: grid;
+      align-content: start;
+      gap: 12px;
+    }
+
+    .statement strong {
+      display: block;
+      font-size: 22px;
+      line-height: 1.15;
+    }
+
+    .ledger {
+      display: grid;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: #fff;
+    }
+
+    .ledger-row {
+      display: grid;
+      grid-template-columns: minmax(120px, 0.8fr) minmax(0, 1fr) minmax(160px, 0.8fr);
+      gap: 12px;
+      align-items: center;
+      min-height: 46px;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .ledger-row:last-child {
+      border-bottom: 0;
+    }
+
+    .ledger-row span {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    .ledger-row p {
+      font-size: 13px;
+    }
+
+    .ledger-row b {
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 14px;
       text-align: right;
+      font-size: 13px;
       overflow-wrap: anywhere;
     }
 
-    .unit-strip {
+    .metric-grid {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 8px;
-      margin-bottom: 18px;
-    }
-
-    .unit {
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      padding: 10px;
-      background: #fff;
-      min-width: 0;
-    }
-
-    .unit b {
-      display: block;
-      margin-bottom: 3px;
-      font-size: 13px;
-    }
-
-    .unit p {
-      font-size: 12px;
-    }
-
-    .decision-list {
-      display: grid;
       gap: 10px;
-    }
-
-    .decision-item {
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      padding: 12px;
-      background: #fff;
-    }
-
-    .decision-item strong {
-      display: block;
-      margin-bottom: 4px;
-      font-size: 13px;
-    }
-
-    .decision-item p {
-      font-size: 13px;
-    }
-
-    .pill-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-top: 12px;
-    }
-
-    .pill {
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      padding: 4px 8px;
-      background: #fbfcfa;
-      color: var(--muted);
-      font-size: 12px;
-      white-space: nowrap;
     }
 
     .metric {
       border: 1px solid var(--line);
-      border-radius: 6px;
+      border-radius: 8px;
+      background: #fff;
       padding: 12px;
       min-width: 0;
     }
 
-    .metric .name {
+    .metric span {
       display: block;
       color: var(--muted);
       font-size: 12px;
       margin-bottom: 6px;
     }
 
-    .metric .value {
+    .metric b {
       display: block;
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 20px;
-      font-weight: 750;
+      font-size: 18px;
+      line-height: 1.2;
       overflow-wrap: anywhere;
     }
 
-    .formula-grid {
+    .timeline {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 18px;
+      gap: 8px;
     }
 
-    .formula {
+    .timeline-step {
       display: grid;
+      grid-template-columns: 34px minmax(0, 1fr) minmax(110px, 0.4fr);
       gap: 10px;
-      align-content: start;
-    }
-
-    .formula strong {
-      color: var(--ink);
-    }
-
-    code {
-      display: block;
-      padding: 10px 12px;
+      align-items: center;
       border: 1px solid var(--line);
-      border-left: 4px solid var(--blue);
-      border-radius: 6px;
-      background: #f7fafc;
-      color: #1a365d;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      border-radius: 8px;
+      padding: 10px;
+      background: #fff;
+    }
+
+    .timeline-step .num {
+      width: 28px;
+      height: 28px;
+      display: inline-grid;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--soft-blue);
+      color: var(--blue);
+      font-weight: 750;
       font-size: 12px;
-      line-height: 1.5;
-      white-space: pre-wrap;
+    }
+
+    .timeline-step strong {
+      display: block;
+      margin-bottom: 2px;
+      font-size: 13px;
+    }
+
+    .timeline-step p {
+      font-size: 12px;
+    }
+
+    .timeline-step b {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      text-align: right;
+      font-size: 12px;
       overflow-wrap: anywhere;
     }
 
-    .note {
+    .outcome-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .outcome-table th,
+    .outcome-table td {
+      padding: 9px 8px;
+      border-bottom: 1px solid var(--line);
+      text-align: right;
+      vertical-align: top;
+    }
+
+    .outcome-table th:first-child,
+    .outcome-table td:first-child {
+      text-align: left;
+    }
+
+    .outcome-table th {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .audit-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(300px, 0.9fr);
+      gap: 14px;
+    }
+
+    .callout {
       border-left: 4px solid var(--amber);
-      padding-left: 10px;
+      padding: 10px 12px;
+      background: var(--soft-amber);
+      border-radius: 6px;
+      color: #5f430d;
       font-size: 13px;
     }
 
@@ -405,120 +436,110 @@
       color: var(--red);
     }
 
-    .flow {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 10px;
-      margin-top: 18px;
-    }
-
-    .step {
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      padding: 12px;
-      background: #fff;
-      min-height: 112px;
-    }
-
-    .step span {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      background: #eaf5ef;
-      color: var(--green);
-      font-weight: 750;
+    .source-line {
+      color: var(--muted);
       font-size: 12px;
-      margin-bottom: 8px;
+      overflow-wrap: anywhere;
     }
 
-    .step p {
-      font-size: 13px;
+    @media (max-width: 1040px) {
+      .shell,
+      header,
+      .stage-focus,
+      .audit-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .controls {
+        position: static;
+      }
     }
 
-    @media (max-width: 960px) {
+    @media (max-width: 720px) {
       main {
+        padding: 14px;
+      }
+
+      h1 {
+        font-size: 24px;
+      }
+
+      .stage-tabs,
+      .metric-grid {
         grid-template-columns: 1fr;
       }
 
-      aside {
-        border-right: 0;
-        border-bottom: 1px solid var(--line);
-      }
-
-      .top-grid,
-      .decision-board,
-      .formula-grid,
-      .flow,
-      .unit-strip {
+      .ledger-row,
+      .timeline-step {
         grid-template-columns: 1fr;
       }
-    }
 
-    @media (max-width: 560px) {
-      aside,
-      .workspace {
-        padding: 16px;
-      }
-
-      .metrics {
-        grid-template-columns: 1fr;
+      .ledger-row b,
+      .timeline-step b {
+        text-align: left;
       }
     }
   </style>
 </head>
 <body>
   <main>
-    <aside>
-      <h1>42Space 定价公式实验台</h1>
-      <p class="lead">所有金额用 USDT，数量用 OT，价格用 USDT/OT，比例用 bps/%。先看一笔账，再看公式。</p>
+    <div class="shell">
+      <header>
+        <div>
+          <h1>从市场刚发出来开始，模拟一笔狙击买入和卖出回收</h1>
+          <p class="lead">这页只做交易理解和卖出估算。真实买入热路径仍然是先发 `swapSimple`，成交后再异步记录价格，避免定价模块影响成交延迟。</p>
+        </div>
+        <div class="source-card">
+          <div class="badge-row">
+            <span class="badge confirmed">已确认: REST 市场快照</span>
+            <span class="badge confirmed">已确认: 76 条 RedeemSwap 回放</span>
+            <span class="badge inferred">推测: 初始池深</span>
+          </div>
+          <code>本页不声称已确认创建者首笔加了多少流动性；缺失 CreateNewMarket + first MintSwap 完整证据。</code>
+        </div>
+      </header>
 
-      <div class="controls">
+      <aside class="panel pad controls">
+        <div>
+          <h2>模拟输入</h2>
+          <p>单位固定：金额是 USDT，数量是 OT，价格是 USDT/OT，比例是 bps 或 %。</p>
+        </div>
+
         <section class="control">
           <div class="label-row">
-            <label for="preSupply">卖出前供应量 OT</label>
-            <output id="preSupplyOut"></output>
+            <label for="buyBudget">你第一时间买入</label>
+            <output id="buyBudgetOut"></output>
           </div>
-          <input id="preSupply" type="range" min="1000" max="150000" step="500" value="42000">
+          <input id="buyBudget" type="range" min="50" max="5000" step="50" value="800">
         </section>
 
         <section class="control">
           <div class="label-row">
-            <label for="sellAmount">准备卖出的数量 OT</label>
-            <output id="sellAmountOut"></output>
+            <label for="poolDepth">初始/早期池深假设</label>
+            <output id="poolDepthOut"></output>
           </div>
-          <input id="sellAmount" type="range" min="100" max="30000" step="100" value="1600">
+          <input id="poolDepth" type="range" min="1000" max="250000" step="1000" value="30000">
         </section>
 
         <section class="control">
           <div class="label-row">
-            <label for="prePrice">当前边际价格 USDT/OT</label>
-            <output id="prePriceOut"></output>
+            <label for="priceMove">别人交易后的价格变化</label>
+            <output id="priceMoveOut"></output>
           </div>
-          <input id="prePrice" type="range" min="0.02" max="0.98" step="0.005" value="0.62">
+          <input id="priceMove" type="range" min="-80" max="200" step="1" value="35">
         </section>
 
         <section class="control">
           <div class="label-row">
-            <label for="curveImpact">曲线磨损强度 bps</label>
-            <output id="curveImpactOut"></output>
+            <label for="extraWear">额外拥挤磨损</label>
+            <output id="extraWearOut"></output>
           </div>
-          <input id="curveImpact" type="range" min="0" max="6500" step="25" value="900">
+          <input id="extraWear" type="range" min="0" max="3000" step="25" value="250">
         </section>
 
         <section class="control">
           <div class="label-row">
-            <label for="protocolTax">赎回税 bps</label>
-            <output id="protocolTaxOut"></output>
-          </div>
-          <input id="protocolTax" type="range" min="0" max="500" step="1" value="80">
-        </section>
-
-        <section class="control">
-          <div class="label-row">
-            <label for="extraTax">额外卖出税 bps</label>
+            <label for="extraTax">额外卖出税</label>
             <output id="extraTaxOut"></output>
           </div>
           <input id="extraTax" type="range" min="0" max="3000" step="25" value="0">
@@ -526,390 +547,321 @@
 
         <section class="control">
           <div class="label-row">
-            <label for="buyBudget">买入预算 USDT</label>
-            <output id="buyBudgetOut"></output>
-          </div>
-          <input id="buyBudget" type="range" min="10" max="5000" step="10" value="800">
-        </section>
-
-        <section class="control">
-          <div class="label-row">
-            <label for="buyOt">买到 / 持有数量 OT</label>
-            <output id="buyOtOut"></output>
-          </div>
-          <input id="buyOt" type="range" min="10" max="20000" step="10" value="1600">
-        </section>
-
-        <section class="control">
-          <div class="label-row">
-            <label for="buyGas">买入 gas 成本 USDT</label>
+            <label for="buyGas">买入 gas</label>
             <output id="buyGasOut"></output>
           </div>
-          <input id="buyGas" type="range" min="0" max="80" step="0.1" value="1.8">
+          <input id="buyGas" type="range" min="0" max="40" step="0.1" value="1.8">
         </section>
 
         <section class="control">
           <div class="label-row">
-            <label for="sellGas">卖出 gas 成本 USDT</label>
+            <label for="sellGas">卖出 gas</label>
             <output id="sellGasOut"></output>
           </div>
-          <input id="sellGas" type="range" min="0" max="80" step="0.1" value="1.8">
+          <input id="sellGas" type="range" min="0" max="40" step="0.1" value="1.8">
         </section>
 
-        <div class="segmented" aria-label="场景">
-          <button type="button" data-preset="calm" class="active">低磨损</button>
-          <button type="button" data-preset="busy">拥挤</button>
-          <button type="button" data-preset="stress">极端</button>
+        <div class="callout">
+          卖出税 80 bps 是现有日志确认项；买入成交数量和早期池深在这里是推测，用来建立直觉，不替代链上报价。
         </div>
-      </div>
-    </aside>
+      </aside>
 
-    <section class="workspace">
-      <section class="plain-ledger">
-        <h2>先只看这条账</h2>
-        <p>单位统一为 USDT 和 OT；默认按“买入后全部卖出”展示。如果只卖一部分，调左侧准备卖出的数量 OT。</p>
-        <div class="ledger-line">
-          <span>1</span>
-          <p>你买入时总共花出去</p>
-          <b id="simpleCost"></b>
-        </div>
-        <div class="ledger-line">
-          <span>2</span>
-          <p>你现在卖出这些 OT，链上曲线先给一个总赎回值</p>
-          <b id="simpleGross"></b>
-        </div>
-        <div class="ledger-line">
-          <span>3</span>
-          <p>扣掉赎回税、额外税和卖出 gas 后，钱包实际收回</p>
-          <b id="simpleRecovered"></b>
-        </div>
-        <div class="ledger-line">
-          <span>4</span>
-          <p>所以这笔从买到卖的净结果</p>
-          <b id="simplePnl"></b>
-        </div>
-      </section>
-
-      <section class="unit-strip" aria-label="单位说明">
-        <div class="unit">
-          <b>USDT</b>
-          <p>抵押币金额；页面里的 gas 也换算成 USDT。</p>
-        </div>
-        <div class="unit">
-          <b>OT</b>
-          <p>Outcome Token 数量，也就是你买到和准备卖出的份额。</p>
-        </div>
-        <div class="unit">
-          <b>USDT / OT</b>
-          <p>单个 OT 的价格；买入均价和边际价格都用这个单位。</p>
-        </div>
-        <div class="unit">
-          <b>bps</b>
-          <p>万分比；80 bps = 0.8%，5000 bps = 50%。</p>
-        </div>
-      </section>
-
-      <section class="decision-board">
-        <article class="panel">
-          <h2>这一刻买入时，真正要看什么</h2>
-          <div class="decision-list">
-            <div class="decision-item">
-              <strong>环境固定项</strong>
-              <p>市场合约、抵押币、outcome token、曲线合约、协议赎回税、router 地址。这些不是下单时临时决定的。</p>
-              <div class="pill-row">
-                <span class="pill">抵押币: BUSDT/USDT</span>
-                <span class="pill">FTRouter.swapSimple</span>
-                <span class="pill">赎回税: 80 bps = 0.8%</span>
-              </div>
-            </div>
-            <div class="decision-item">
-              <strong>买入瞬间变量</strong>
-              <p>你愿意花多少 USDT、gas 是否足够、是否已有 allowance、市场是否刚创建且符合过滤条件。狙击时不要等卖出价格计算。</p>
-              <div class="pill-row">
-                <span class="pill" id="buyBudgetPill"></span>
-                <span class="pill" id="buyOtPill"></span>
-                <span class="pill" id="avgBuyPill"></span>
-              </div>
-            </div>
-            <div class="decision-item">
-              <strong>买入后才知道</strong>
-              <p>实际拿到多少 OT、实际成交均价、后续别人买卖导致的供应量变化。这些决定你卖出时能收回多少钱。</p>
-            </div>
-          </div>
-        </article>
-
-        <article class="panel">
-          <h2>如果现在卖出，现金流怎么走</h2>
-          <div class="cashflow">
-            <div class="cash-row">
-              <span>买入支出</span>
-              <p>预算 + 买入 gas</p>
-              <b class="minus" id="cashBuyOut"></b>
-            </div>
-            <div class="cash-row">
-              <span>spot 估值</span>
-              <p>按当前边际价格估算</p>
-              <b id="cashSpot"></b>
-            </div>
-            <div class="cash-row">
-              <span>曲线磨损</span>
-              <p>大单砸曲线损失</p>
-              <b class="minus" id="cashCurveLoss"></b>
-            </div>
-            <div class="cash-row">
-              <span>赎回税</span>
-              <p>进入 treasury</p>
-              <b class="minus" id="cashProtocolTax"></b>
-            </div>
-            <div class="cash-row">
-              <span>额外卖出税</span>
-              <p>自定义保守扣减</p>
-              <b class="minus" id="cashExtraTax"></b>
-            </div>
-            <div class="cash-row">
-              <span>卖出 gas</span>
-              <p>链上执行成本</p>
-              <b class="minus" id="cashSellGas"></b>
-            </div>
-            <div class="cash-row">
-              <span>最终收回</span>
-              <p>到手 USDT - 卖出 gas</p>
-              <b class="plus" id="cashRecover"></b>
-            </div>
-            <div class="cash-row">
-              <span>净盈亏</span>
-              <p>最终收回 - 买入总成本</p>
-              <b id="cashPnl"></b>
-            </div>
-          </div>
-        </article>
-      </section>
-
-      <div class="top-grid">
-        <section class="panel canvas-wrap">
-          <div>
-            <h2>卖出时的价格变化</h2>
-            <p>绿色线是赎回前后的边际价格，蓝色面积是按当前数量赎回得到的总价值。</p>
-          </div>
-          <canvas id="curve" width="900" height="440"></canvas>
-        </section>
-
+      <section class="stack">
         <section class="panel">
-          <h2>当前计算结果</h2>
-          <div class="metrics">
-            <div class="metric">
-              <span class="name">买入均价</span>
-              <span class="value" id="avgBuyPrice"></span>
+          <div class="stage-tabs" aria-label="交易阶段">
+            <button type="button" data-stage="0" class="active">0 市场创建</button>
+            <button type="button" data-stage="1">1 初始流动性</button>
+            <button type="button" data-stage="2">2 你买入</button>
+            <button type="button" data-stage="3">3 别人交易</button>
+            <button type="button" data-stage="4">4 你卖出</button>
+          </div>
+
+          <div class="simulation">
+            <div class="stage-focus">
+              <article class="statement">
+                <div class="badge-row" id="stageBadges"></div>
+                <strong id="stageTitle"></strong>
+                <p id="stageText"></p>
+                <p class="source-line" id="stageSource"></p>
+              </article>
+
+              <div class="ledger" aria-label="模拟现金流">
+                <div class="ledger-row">
+                  <span>买入支出</span>
+                  <p>你发 exact-in 买入，热路径不等报价计算。</p>
+                  <b class="warn" id="ledgerBuy"></b>
+                </div>
+                <div class="ledger-row">
+                  <span>拿到持仓</span>
+                  <p>按当前市场价格估算，真实值以 MintSwap 日志为准。</p>
+                  <b id="ledgerOt"></b>
+                </div>
+                <div class="ledger-row">
+                  <span>卖出总赎回</span>
+                  <p>先按卖出时价格估算，再扣曲线磨损。</p>
+                  <b id="ledgerGross"></b>
+                </div>
+                <div class="ledger-row">
+                  <span>协议赎回税</span>
+                  <p>已有真实 RedeemSwap 回放确认约 80 bps。</p>
+                  <b class="warn" id="ledgerTax"></b>
+                </div>
+                <div class="ledger-row">
+                  <span>钱包收回</span>
+                  <p>赎回到手减额外税和卖出 gas。</p>
+                  <b class="ok" id="ledgerRecovered"></b>
+                </div>
+                <div class="ledger-row">
+                  <span>净结果</span>
+                  <p>钱包收回减买入预算和买入 gas。</p>
+                  <b id="ledgerPnl"></b>
+                </div>
+              </div>
             </div>
-            <div class="metric">
-              <span class="name">赎回总值</span>
-              <span class="value" id="grossRedeem"></span>
+
+            <div class="metric-grid">
+              <div class="metric">
+                <span>买入价格</span>
+                <b id="metricBuyPrice"></b>
+              </div>
+              <div class="metric">
+                <span>卖出价格</span>
+                <b id="metricExitPrice"></b>
+              </div>
+              <div class="metric">
+                <span>曲线磨损</span>
+                <b id="metricWear"></b>
+              </div>
+              <div class="metric">
+                <span>50% 保护</span>
+                <b id="metricGuard"></b>
+              </div>
             </div>
-            <div class="metric">
-              <span class="name">赎回到手</span>
-              <span class="value" id="toUser"></span>
-            </div>
-            <div class="metric">
-              <span class="name">协议税</span>
-              <span class="value" id="treasuryFee"></span>
-            </div>
-            <div class="metric">
-              <span class="name">曲线磨损</span>
-              <span class="value" id="slippage"></span>
-            </div>
-            <div class="metric">
-              <span class="name">有效损耗</span>
-              <span class="value" id="effectiveLoss"></span>
+
+            <div class="timeline">
+              <div class="timeline-step">
+                <span class="num">0</span>
+                <div>
+                  <strong>市场出现</strong>
+                  <p>确认 collateral、curve、outcome token。只监听和过滤，不做重计算。</p>
+                </div>
+                <b>USDT market</b>
+              </div>
+              <div class="timeline-step">
+                <span class="num">1</span>
+                <div>
+                  <strong>池子形成</strong>
+                  <p>部署者或早期 LP 可能提供流动性。精确初始数量未确认，页面用池深假设。</p>
+                </div>
+                <b id="flowDepth"></b>
+              </div>
+              <div class="timeline-step">
+                <span class="num">2</span>
+                <div>
+                  <strong>你先买入</strong>
+                  <p>狙击时先广播交易；成交后再从日志反算均价和持仓。</p>
+                </div>
+                <b id="flowBought"></b>
+              </div>
+              <div class="timeline-step">
+                <span class="num">3</span>
+                <div>
+                  <strong>别人推动价格</strong>
+                  <p>后续买卖会改变边际价格和供应量，所以卖出价不是买入时固定的。</p>
+                </div>
+                <b id="flowMoved"></b>
+              </div>
+              <div class="timeline-step">
+                <span class="num">4</span>
+                <div>
+                  <strong>你卖出回收</strong>
+                  <p>实盘必须调用 curve 报价；磨损超过 50% 时不卖，只记录日志。</p>
+                </div>
+                <b id="flowRecovered"></b>
+              </div>
             </div>
           </div>
-          <p class="note" id="guardNote"></p>
         </section>
-      </div>
 
-      <section class="formula-grid">
-        <article class="panel formula">
-          <h2>1. 买入价格</h2>
-          <p><strong>实盘策略：</strong>买入热路径不先算价，直接用 `swapSimple` exact-in 发送交易。价格在成交后用事件或日志解释。</p>
-          <code>avg_buy_price_usdt_per_ot = spent_usdt / received_ot</code>
-          <p id="buyExplain"></p>
-        </article>
+        <section class="audit-grid">
+          <article class="panel pad stack">
+            <div>
+              <h2>真实市场快照：用于模拟买入的起点</h2>
+              <p>这不是初始状态，而是 REST 当前快照。它告诉我们真实市场有哪些 outcome、当前价格、当前已铸数量和交易规模。</p>
+            </div>
+            <div class="source-card">
+              <div class="badge-row">
+                <span class="badge confirmed">已确认</span>
+                <span class="badge">market: 0xBeaccE...691A</span>
+                <span class="badge">creator: Deep Thought Labs</span>
+              </div>
+              <code>HYPE vs BNB: Higher FDV on Dec 31st 2026?</code>
+              <p class="source-line">REST updatedAt 约 2026-05-27T03:04:00Z；collateral 是 USDT；curve 是 0xDC2604...0B8。</p>
+            </div>
+            <table class="outcome-table" aria-label="真实 outcome 快照">
+              <thead>
+                <tr>
+                  <th>Outcome</th>
+                  <th>Token ID</th>
+                  <th>价格 USDT/OT</th>
+                  <th>当前已铸 OT</th>
+                  <th>成交量 USDT</th>
+                </tr>
+              </thead>
+              <tbody id="outcomeRows"></tbody>
+            </table>
+          </article>
 
-        <article class="panel formula">
-          <h2>2. 赎回定价</h2>
-          <p>卖出服务用曲线合约对指定 OT 数量报价，链上返回用户到手和金库税两部分。</p>
-          <code>user_redeem_usdt, treasury_tax_usdt = calRedeemValueByOtDelta(market, tokenId, sell_OT)
-gross_redeem_usdt = user_redeem_usdt + treasury_tax_usdt</code>
-          <p id="redeemExplain"></p>
-        </article>
+          <article class="panel pad stack">
+            <div>
+              <h2>真实卖出校验：用于确认税和赎回公式</h2>
+              <p>这条来自本仓库已有 validation JSONL。程序在前一块状态回放 `calRedeemValueByOtDelta`，和链上 RedeemSwap 事件对比。</p>
+            </div>
+            <div class="ledger">
+              <div class="ledger-row">
+                <span>真实卖出</span>
+                <p>Polymarket FDV 市场，tokenId 1。</p>
+                <b>46,974.51 OT</b>
+              </div>
+              <div class="ledger-row">
+                <span>赎回总值</span>
+                <p>用户到手 + treasury 税。</p>
+                <b>447.551972 USDT</b>
+              </div>
+              <div class="ledger-row">
+                <span>用户到手</span>
+                <p>RedeemSwap event_collateral_to_user。</p>
+                <b class="ok">443.971556 USDT</b>
+              </div>
+              <div class="ledger-row">
+                <span>协议税</span>
+                <p>RedeemSwap event_collateral_to_treasury。</p>
+                <b class="warn">3.580416 USDT</b>
+              </div>
+              <div class="ledger-row">
+                <span>税率</span>
+                <p>treasury / gross * 10000。</p>
+                <b>80 bps (0.80%)</b>
+              </div>
+              <div class="ledger-row">
+                <span>回放差异</span>
+                <p>computed 和 event 对比。</p>
+                <b class="ok">0 wei</b>
+              </div>
+            </div>
+            <p class="source-line">样本：block 100543145，tx 0x845b60e5...15a6，market 0x4E44AC...cA6b。总计 76/76 条样本通过，覆盖 3 个 market。</p>
+            <div class="callout">
+              这条日志没有保存当时的边际 spot 价格，所以“磨损”不能只靠这条样本确认。本页磨损部分是推测模拟；实盘仍以链上 curve 报价为准。
+            </div>
+          </article>
+        </section>
 
-        <article class="panel formula">
-          <h2>3. 赎回税</h2>
-          <p>赎回税不是从配置里猜，而是由链上报价中的 treasury 部分反推。</p>
-          <code>protocol_tax_bps = treasury_tax_usdt / gross_redeem_usdt * 10000
-80 bps = 0.8%</code>
-          <p id="taxExplain"></p>
-        </article>
-
-        <article class="panel formula">
-          <h2>4. 磨损与保护</h2>
-          <p>磨损只比较边际现货估值和曲线赎回总值；有效损耗再把协议税和额外卖出税算进去。</p>
-          <code>spot_value_usdt = sell_OT * current_marginal_price_usdt_per_ot
-slippage_bps = max(0, spot_value_usdt - gross_redeem_usdt) / spot_value_usdt * 10000
-final_recovered_usdt = user_redeem_usdt - extra_sell_tax_usdt - sell_gas_usdt
-effective_loss_bps = max(0, spot_value_usdt - final_recovered_usdt) / spot_value_usdt * 10000</code>
-          <p id="lossExplain"></p>
-        </article>
+        <section class="panel pad stack">
+          <h2>哪些是 fixed，哪些是下单后才知道</h2>
+          <div class="timeline">
+            <div class="timeline-step">
+              <span class="num">F</span>
+              <div>
+                <strong>环境 fixed</strong>
+                <p>controller、router、collateral、market、curve、tokenId、协议税口径、RPC 限速、gas 策略。</p>
+              </div>
+              <b>配置/链上读取</b>
+            </div>
+            <div class="timeline-step">
+              <span class="num">B</span>
+              <div>
+                <strong>买入瞬间变量</strong>
+                <p>买入预算、当前 gas、allowance、pending 竞争、该 market 是否通过过滤。不要让卖出报价阻塞买入。</p>
+              </div>
+              <b>热路径</b>
+            </div>
+            <div class="timeline-step">
+              <span class="num">S</span>
+              <div>
+                <strong>卖出才需要精算</strong>
+                <p>持仓 OT、当前 supply、边际价格、curve 赎回报价、协议税、额外税、卖出 gas、50% 磨损保护。</p>
+              </div>
+              <b>异步/卖出服务</b>
+            </div>
+          </div>
+        </section>
       </section>
-
-      <section class="flow" aria-label="流程">
-        <div class="step">
-          <span>1</span>
-          <h3>狙击买入</h3>
-          <p>收到新市场事件后先发 exact-in 买入交易，不让价格分析阻塞成交。</p>
-        </div>
-        <div class="step">
-          <span>2</span>
-          <h3>异步采样</h3>
-          <p>成交后再读链上价格，记录不同时间点的卖出报价。</p>
-        </div>
-        <div class="step">
-          <span>3</span>
-          <h3>卖出判断</h3>
-          <p>卖出服务看赎回总值、协议税、额外税和磨损。</p>
-        </div>
-        <div class="step">
-          <span>4</span>
-          <h3>保护阈值</h3>
-          <p>曲线磨损超过 50% 时不执行卖出，只写日志。</p>
-        </div>
-      </section>
-    </section>
+    </div>
   </main>
 
   <script>
+    const REAL_MARKET = {
+      address: "0xBeaccE47578aC8BFf2b8cE1c66D7Ab65C811691A",
+      question: "HYPE vs BNB: Higher FDV on Dec 31st 2026?",
+      createdAt: "2026-05-25T08:51:59Z",
+      collateral: "USDT",
+      curve: "0xDC26047458FEa8Bd45164217CCb7eE90b9bE10B8",
+      baseOutcome: "HYPE",
+      basePrice: 0.057558566754541095,
+      outcomes: [
+        { symbol: "HYPE", tokenId: "1", price: 0.057558566754541095, minted: 2655427.43, volume: 180283.88303551736 },
+        { symbol: "BNB", tokenId: "2", price: 0.056608086364515954, minted: 2597122.34, volume: 451286.1840759103 },
+        { symbol: "Draw", tokenId: "4", price: 0.016450598006420868, minted: 499908.43, volume: 15344.55983395228 }
+      ]
+    };
+
+    const VALIDATION = {
+      samples: 76,
+      passed: 76,
+      uniqueMarkets: 3,
+      redeemTaxBps: 80
+    };
+
     const controls = {
-      preSupply: document.getElementById("preSupply"),
-      sellAmount: document.getElementById("sellAmount"),
-      prePrice: document.getElementById("prePrice"),
-      curveImpact: document.getElementById("curveImpact"),
-      protocolTax: document.getElementById("protocolTax"),
-      extraTax: document.getElementById("extraTax"),
       buyBudget: document.getElementById("buyBudget"),
-      buyOt: document.getElementById("buyOt"),
+      poolDepth: document.getElementById("poolDepth"),
+      priceMove: document.getElementById("priceMove"),
+      extraWear: document.getElementById("extraWear"),
+      extraTax: document.getElementById("extraTax"),
       buyGas: document.getElementById("buyGas"),
       sellGas: document.getElementById("sellGas")
     };
 
-    const presets = {
-      calm: {
-        preSupply: 42000,
-        sellAmount: 1600,
-        prePrice: 0.62,
-        curveImpact: 900,
-        protocolTax: 80,
-        extraTax: 0,
-        buyBudget: 800,
-        buyOt: 1600,
-        buyGas: 1.8,
-        sellGas: 1.8
+    const stages = [
+      {
+        title: "市场刚创建时，我们先确认合约边界，不急着算卖出价",
+        text: `真实快照里的 market 使用 ${REAL_MARKET.collateral}，有 curve 地址和三个 outcome。创建事件能告诉 bot market、collateral、curve、questionId。`,
+        source: "已确认: REST 市场快照；未确认: 该 market 创建交易里的首笔流动性金额。",
+        badges: ["confirmed", "unknown"]
       },
-      busy: {
-        preSupply: 30000,
-        sellAmount: 4200,
-        prePrice: 0.48,
-        curveImpact: 2400,
-        protocolTax: 80,
-        extraTax: 400,
-        buyBudget: 1200,
-        buyOt: 4200,
-        buyGas: 4.5,
-        sellGas: 4.5
+      {
+        title: "初始流动性决定同样一笔卖出会不会砸穿价格",
+        text: "部署者或早期 LP 可以让池子变深。池越浅，你卖出同样数量 OT 时曲线磨损越大。本页的池深是推测输入。",
+        source: "推测: poolDepth 用于直觉模拟；实盘读取 totalSupply 和 curve 报价。",
+        badges: ["inferred"]
       },
-      stress: {
-        preSupply: 12000,
-        sellAmount: 9000,
-        prePrice: 0.35,
-        curveImpact: 6200,
-        protocolTax: 80,
-        extraTax: 1400,
-        buyBudget: 1500,
-        buyOt: 9000,
-        buyGas: 12,
-        sellGas: 12
+      {
+        title: "狙击买入时，先成交，成交后再解释价格",
+        text: "买入热路径只需要过滤 market、构造 calldata、签名、广播。买到多少 OT 用 MintSwap 或余额变化确认。",
+        source: "已确认: 仓库实现把 price sampler 放在 post-buy；推测: 本页用当前 REST 价格估算买到的 OT。",
+        badges: ["confirmed", "inferred"]
+      },
+      {
+        title: "别人继续交易后，你的卖出价格会变",
+        text: "别人买入会推高或推低边际价格，也会改变 supply。你现在看到的卖出回收，不等于买入那一刻锁死的收益。",
+        source: "推测: priceMove 滑块模拟别人交易后的价格变化。",
+        badges: ["inferred"]
+      },
+      {
+        title: "卖出服务才做精算，并执行 50% 磨损保护",
+        text: "卖出前调用 curve 报价，拆出用户到手和 treasury 税。如果曲线磨损超过 5000 bps，就不执行卖出，只写日志。",
+        source: `已确认: ${VALIDATION.passed}/${VALIDATION.samples} 条真实 RedeemSwap 回放通过，赎回税样本为 80 bps。`,
+        badges: ["confirmed"]
       }
-    };
+    ];
 
     const $ = (id) => document.getElementById(id);
     const nf = new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 4 });
-
-    function state() {
-      const preSupply = Number(controls.preSupply.value);
-      const sellAmount = Math.min(Number(controls.sellAmount.value), preSupply);
-      controls.sellAmount.value = String(sellAmount);
-      return {
-        preSupply,
-        sellAmount,
-        prePrice: Number(controls.prePrice.value),
-        curveImpactBps: Number(controls.curveImpact.value),
-        protocolTaxBps: Number(controls.protocolTax.value),
-        extraTaxBps: Number(controls.extraTax.value),
-        buyBudget: Number(controls.buyBudget.value),
-        buyOt: Number(controls.buyOt.value),
-        buyGas: Number(controls.buyGas.value),
-        sellGas: Number(controls.sellGas.value)
-      };
-    }
-
-    function compute(s) {
-      const share = s.sellAmount / Math.max(1, s.preSupply);
-      const curveLossBps = Math.min(9800, s.curveImpactBps * share * 2.25);
-      const spotValue = s.sellAmount * s.prePrice;
-      const grossRedeem = spotValue * Math.max(0, 1 - curveLossBps / 10000);
-      const treasuryFee = grossRedeem * s.protocolTaxBps / 10000;
-      const toUser = grossRedeem - treasuryFee;
-      const extraTax = toUser * s.extraTaxBps / 10000;
-      const netToUser = Math.max(0, toUser - extraTax);
-      const recoveredAfterGas = Math.max(0, netToUser - s.sellGas);
-      const slippageBps = lossBps(spotValue, grossRedeem);
-      const effectiveLossBps = lossBps(spotValue, recoveredAfterGas);
-      const avgBuyPrice = s.buyBudget / Math.max(1, s.buyOt);
-      const buyTax = s.buyBudget * s.protocolTaxBps / 10000;
-      const buyTotalCost = s.buyBudget + s.buyGas;
-      const pnl = recoveredAfterGas - buyTotalCost;
-      const postSupply = s.preSupply - s.sellAmount;
-      const postPrice = Math.max(0.001, s.prePrice * (1 - curveLossBps / 14000));
-
-      return {
-        curveLossBps,
-        spotValue,
-        grossRedeem,
-        treasuryFee,
-        toUser,
-        extraTax,
-        netToUser,
-        recoveredAfterGas,
-        slippageBps,
-        effectiveLossBps,
-        avgBuyPrice,
-        buyTax,
-        buyTotalCost,
-        pnl,
-        postSupply,
-        postPrice
-      };
-    }
-
-    function lossBps(reference, actual) {
-      if (reference <= 0 || actual >= reference) return 0;
-      return (reference - actual) / reference * 10000;
-    }
+    const pf = new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 6 });
+    let activeStage = 0;
 
     function usdt(value) {
       return `${nf.format(value)} USDT`;
-    }
-
-    function signedUsdt(value) {
-      return `${value >= 0 ? "+" : ""}${usdt(value)}`;
     }
 
     function ot(value) {
@@ -917,170 +869,137 @@ effective_loss_bps = max(0, spot_value_usdt - final_recovered_usdt) / spot_value
     }
 
     function price(value) {
-      return `${value.toFixed(6)} USDT/OT`;
+      return `${pf.format(value)} USDT/OT`;
     }
 
     function bps(value) {
       return `${nf.format(value)} bps (${(value / 100).toFixed(2)}%)`;
     }
 
-    function updateOutputs(s, r) {
-      $("preSupplyOut").value = ot(s.preSupply);
-      $("sellAmountOut").value = ot(s.sellAmount);
-      $("prePriceOut").value = `${s.prePrice.toFixed(3)} USDT/OT`;
-      $("curveImpactOut").value = bps(s.curveImpactBps);
-      $("protocolTaxOut").value = bps(s.protocolTaxBps);
-      $("extraTaxOut").value = bps(s.extraTaxBps);
+    function pct(value) {
+      return `${value > 0 ? "+" : ""}${nf.format(value)}%`;
+    }
+
+    function state() {
+      return {
+        buyBudget: Number(controls.buyBudget.value),
+        poolDepth: Number(controls.poolDepth.value),
+        priceMove: Number(controls.priceMove.value),
+        extraWearBps: Number(controls.extraWear.value),
+        extraTaxBps: Number(controls.extraTax.value),
+        buyGas: Number(controls.buyGas.value),
+        sellGas: Number(controls.sellGas.value)
+      };
+    }
+
+    function compute(s) {
+      const buyPrice = REAL_MARKET.basePrice;
+      const otBought = s.buyBudget / buyPrice;
+      const exitPrice = Math.max(0.000001, buyPrice * (1 + s.priceMove / 100));
+      const spotValue = otBought * exitPrice;
+      const poolWearBps = Math.min(7000, spotValue / Math.max(1, s.poolDepth) * 3500);
+      const wearBps = Math.min(9500, poolWearBps + s.extraWearBps);
+      const curveLoss = spotValue * wearBps / 10000;
+      const grossRedeem = Math.max(0, spotValue - curveLoss);
+      const protocolTax = grossRedeem * VALIDATION.redeemTaxBps / 10000;
+      const afterProtocol = grossRedeem - protocolTax;
+      const extraTax = afterProtocol * s.extraTaxBps / 10000;
+      const recovered = Math.max(0, afterProtocol - extraTax - s.sellGas);
+      const totalCost = s.buyBudget + s.buyGas;
+      const pnl = recovered - totalCost;
+      const executable = wearBps <= 5000;
+      return {
+        buyPrice,
+        otBought,
+        exitPrice,
+        spotValue,
+        poolWearBps,
+        wearBps,
+        curveLoss,
+        grossRedeem,
+        protocolTax,
+        extraTax,
+        recovered,
+        totalCost,
+        pnl,
+        executable
+      };
+    }
+
+    function updateControls(s) {
       $("buyBudgetOut").value = usdt(s.buyBudget);
-      $("buyOtOut").value = ot(s.buyOt);
+      $("poolDepthOut").value = usdt(s.poolDepth);
+      $("priceMoveOut").value = pct(s.priceMove);
+      $("extraWearOut").value = bps(s.extraWearBps);
+      $("extraTaxOut").value = bps(s.extraTaxBps);
       $("buyGasOut").value = usdt(s.buyGas);
       $("sellGasOut").value = usdt(s.sellGas);
-
-      $("simpleCost").textContent = usdt(r.buyTotalCost);
-      $("simpleGross").textContent = usdt(r.grossRedeem);
-      $("simpleRecovered").textContent = usdt(r.recoveredAfterGas);
-      $("simplePnl").textContent = signedUsdt(r.pnl);
-      $("simplePnl").className = r.pnl >= 0 ? "plus" : "minus";
-
-      $("avgBuyPrice").textContent = price(r.avgBuyPrice);
-      $("grossRedeem").textContent = usdt(r.grossRedeem);
-      $("toUser").textContent = usdt(r.toUser);
-      $("treasuryFee").textContent = usdt(r.treasuryFee);
-      $("slippage").textContent = bps(r.slippageBps);
-      $("effectiveLoss").textContent = bps(r.effectiveLossBps);
-
-      $("buyBudgetPill").textContent = `预算 ${usdt(s.buyBudget)}`;
-      $("buyOtPill").textContent = `持仓 ${ot(s.buyOt)}`;
-      $("avgBuyPill").textContent = `均价 ${price(r.avgBuyPrice)}`;
-      $("cashBuyOut").textContent = `-${usdt(r.buyTotalCost)}`;
-      $("cashSpot").textContent = usdt(r.spotValue);
-      $("cashCurveLoss").textContent = `-${usdt(Math.max(0, r.spotValue - r.grossRedeem))}`;
-      $("cashProtocolTax").textContent = `-${usdt(r.treasuryFee)}`;
-      $("cashExtraTax").textContent = `-${usdt(r.extraTax)}`;
-      $("cashSellGas").textContent = `-${usdt(s.sellGas)}`;
-      $("cashRecover").textContent = usdt(r.recoveredAfterGas);
-      $("cashPnl").textContent = signedUsdt(r.pnl);
-      $("cashPnl").className = r.pnl >= 0 ? "plus" : "minus";
-
-      const guard = r.slippageBps > 5000;
-      $("guardNote").className = `note ${guard ? "warn" : "ok"}`;
-      $("guardNote").textContent = guard
-        ? `当前曲线磨损 ${bps(r.slippageBps)}，超过 50%，卖出服务应阻止交易并写日志。`
-        : `当前曲线磨损 ${bps(r.slippageBps)}，低于 50% 阈值，是否卖出再结合策略条件判断。`;
-
-      $("buyExplain").textContent =
-        `这里的买入均价 = ${usdt(s.buyBudget)} / ${ot(s.buyOt)} = ${price(r.avgBuyPrice)}。买入总成本还要加 gas：${usdt(r.buyTotalCost)}。`;
-      $("redeemExplain").textContent =
-        `按当前参数，spot 估值 ${usdt(r.spotValue)}，曲线赎回总值 ${usdt(r.grossRedeem)}，扣协议税后用户到手 ${usdt(r.toUser)}。`;
-      $("taxExplain").textContent =
-        `赎回税 = ${usdt(r.treasuryFee)} / ${usdt(r.grossRedeem)} * 10000 = ${bps(s.protocolTaxBps)}。历史日志反推稳定为 80 bps。`;
-      $("lossExplain").textContent =
-        `曲线磨损 ${bps(r.slippageBps)}；扣掉协议税、额外卖出税和卖出 gas 后，最终收回 ${usdt(r.recoveredAfterGas)}，有效损耗为 ${bps(r.effectiveLossBps)}。`;
     }
 
-    function drawCurve(s, r) {
-      const canvas = $("curve");
-      const ctx = canvas.getContext("2d");
-      const width = canvas.width;
-      const height = canvas.height;
-      const pad = 52;
-      ctx.clearRect(0, 0, width, height);
+    function updateSimulation(s, r) {
+      $("ledgerBuy").textContent = `-${usdt(r.totalCost)}`;
+      $("ledgerOt").textContent = ot(r.otBought);
+      $("ledgerGross").textContent = usdt(r.grossRedeem);
+      $("ledgerTax").textContent = `-${usdt(r.protocolTax)}`;
+      $("ledgerRecovered").textContent = usdt(r.recovered);
+      $("ledgerPnl").textContent = `${r.pnl >= 0 ? "+" : ""}${usdt(r.pnl)}`;
+      $("ledgerPnl").className = r.pnl >= 0 ? "ok" : "warn";
 
-      ctx.strokeStyle = "#d9dfd8";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      for (let i = 0; i <= 5; i += 1) {
-        const y = pad + (height - pad * 2) * i / 5;
-        ctx.moveTo(pad, y);
-        ctx.lineTo(width - pad, y);
-      }
-      ctx.stroke();
+      $("metricBuyPrice").textContent = price(r.buyPrice);
+      $("metricExitPrice").textContent = price(r.exitPrice);
+      $("metricWear").textContent = bps(r.wearBps);
+      $("metricGuard").textContent = r.executable ? "可继续评估" : "阻止卖出";
+      $("metricGuard").className = r.executable ? "ok" : "warn";
 
-      const minSupply = Math.max(0, s.preSupply - s.sellAmount * 1.35);
-      const maxSupply = s.preSupply + s.sellAmount * 0.35;
-      const supplySpan = Math.max(1, maxSupply - minSupply);
-      const priceAt = (supply) => {
-        const distance = (s.preSupply - supply) / Math.max(1, s.sellAmount);
-        const loss = Math.max(0, distance) * r.curveLossBps / 10000;
-        return Math.max(0.001, s.prePrice * (1 - loss * 0.75));
-      };
-      const yMax = Math.max(1, s.prePrice * 1.12);
-      const xFor = (supply) => pad + (supply - minSupply) / supplySpan * (width - pad * 2);
-      const yFor = (price) => height - pad - price / yMax * (height - pad * 2);
-
-      const startX = xFor(r.postSupply);
-      const endX = xFor(s.preSupply);
-      ctx.fillStyle = "rgba(37, 99, 168, 0.14)";
-      ctx.beginPath();
-      ctx.moveTo(startX, height - pad);
-      for (let i = 0; i <= 80; i += 1) {
-        const supply = r.postSupply + (s.sellAmount * i / 80);
-        ctx.lineTo(xFor(supply), yFor(priceAt(supply)));
-      }
-      ctx.lineTo(endX, height - pad);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.strokeStyle = "#176b4d";
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      for (let i = 0; i <= 140; i += 1) {
-        const supply = minSupply + supplySpan * i / 140;
-        const x = xFor(supply);
-        const y = yFor(priceAt(supply));
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-
-      marker(ctx, xFor(s.preSupply), yFor(s.prePrice), "卖出前", "#176b4d");
-      marker(ctx, xFor(r.postSupply), yFor(r.postPrice), "卖出后", "#a23a32");
-
-      ctx.fillStyle = "#63716c";
-      ctx.font = "24px ui-sans-serif, system-ui, sans-serif";
-      ctx.fillText("供应量 (OT)", width - 160, height - 18);
-      ctx.save();
-      ctx.translate(22, 116);
-      ctx.rotate(-Math.PI / 2);
-      ctx.fillText("边际价格 (USDT/OT)", 0, 0);
-      ctx.restore();
+      $("flowDepth").textContent = usdt(s.poolDepth);
+      $("flowBought").textContent = ot(r.otBought);
+      $("flowMoved").textContent = price(r.exitPrice);
+      $("flowRecovered").textContent = usdt(r.recovered);
     }
 
-    function marker(ctx, x, y, label, color) {
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.arc(x, y, 6, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.font = "24px ui-sans-serif, system-ui, sans-serif";
-      ctx.fillText(label, x + 10, y - 10);
+    function updateStage() {
+      const stage = stages[activeStage];
+      $("stageTitle").textContent = stage.title;
+      $("stageText").textContent = stage.text;
+      $("stageSource").textContent = stage.source;
+      $("stageBadges").innerHTML = stage.badges.map((type) => {
+        const label = type === "confirmed" ? "已确认" : type === "inferred" ? "推测" : "未确认";
+        return `<span class="badge ${type}">${label}</span>`;
+      }).join("");
+      document.querySelectorAll("[data-stage]").forEach((button) => {
+        button.classList.toggle("active", Number(button.dataset.stage) === activeStage);
+      });
+    }
+
+    function renderOutcomes() {
+      $("outcomeRows").innerHTML = REAL_MARKET.outcomes.map((item) => `
+        <tr>
+          <td>${item.symbol}</td>
+          <td class="mono">${item.tokenId}</td>
+          <td class="mono">${price(item.price)}</td>
+          <td class="mono">${ot(item.minted)}</td>
+          <td class="mono">${usdt(item.volume)}</td>
+        </tr>
+      `).join("");
     }
 
     function update() {
       const s = state();
       const r = compute(s);
-      updateOutputs(s, r);
-      drawCurve(s, r);
+      updateControls(s);
+      updateSimulation(s, r);
+      updateStage();
     }
 
-    Object.values(controls).forEach((input) => {
-      input.addEventListener("input", () => {
-        document.querySelectorAll("[data-preset]").forEach((button) => button.classList.remove("active"));
-        update();
-      });
-    });
-
-    document.querySelectorAll("[data-preset]").forEach((button) => {
+    Object.values(controls).forEach((input) => input.addEventListener("input", update));
+    document.querySelectorAll("[data-stage]").forEach((button) => {
       button.addEventListener("click", () => {
-        const preset = presets[button.dataset.preset];
-        Object.entries(preset).forEach(([key, value]) => {
-          controls[key].value = String(value);
-        });
-        document.querySelectorAll("[data-preset]").forEach((item) => item.classList.remove("active"));
-        button.classList.add("active");
-        update();
+        activeStage = Number(button.dataset.stage);
+        updateStage();
       });
     });
 
+    renderOutcomes();
     update();
   </script>
 </body>
