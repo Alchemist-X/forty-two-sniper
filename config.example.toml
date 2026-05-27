@@ -1,7 +1,12 @@
 [rpc]
 # Use a paid low-latency Tokyo BNB Chain endpoint for real runs.
+# QuickNode and Alchemy BNB endpoints are both supported. For Alchemy:
+# http_url = "https://bnb-mainnet.g.alchemy.com/v2/your-api-key"
+# ws_url = "wss://bnb-mainnet.g.alchemy.com/v2/your-api-key"
 http_url = "https://bsc-dataseed.bnbchain.org"
 ws_url = "wss://your-bnb-ws-endpoint.example"
+# Optional: use Alchemy PAYG or another log-friendly provider for historical scans.
+# scan_http_url = "https://bnb-mainnet.g.alchemy.com/v2/your-api-key"
 chain_id = 56
 max_requests_per_second = 15
 
@@ -23,6 +28,12 @@ gas_limit = 300000
 gas_price_bump_bps = 2000
 dry_run = true
 wait_for_receipt = false
+
+[latency]
+enabled = true
+log_path = "logs/latency.jsonl"
+# Set to quicknode-discover, quicknode-build, alchemy-payg, etc.
+provider_label = "primary"
 
 [pricing]
 enabled = true

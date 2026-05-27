@@ -12,6 +12,8 @@ pub struct Settings {
     pub contracts: ContractConfig,
     pub strategy: StrategyConfig,
     #[serde(default)]
+    pub latency: LatencyConfig,
+    #[serde(default)]
     pub pricing: PricingConfig,
     #[serde(default)]
     pub metadata: MetadataConfig,
@@ -23,6 +25,8 @@ pub struct Settings {
 pub struct RpcConfig {
     pub http_url: String,
     pub ws_url: String,
+    #[serde(default)]
+    pub scan_http_url: Option<String>,
     #[serde(default = "default_chain_id")]
     pub chain_id: u64,
     #[serde(default = "default_max_requests_per_second")]
@@ -77,6 +81,16 @@ pub struct PricingConfig {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct LatencyConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default = "default_latency_log_path")]
+    pub log_path: String,
+    #[serde(default = "default_provider_label")]
+    pub provider_label: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct MetadataConfig {
     #[serde(default)]
     pub enabled: bool,
@@ -114,6 +128,16 @@ impl Default for PricingConfig {
     }
 }
 
+impl Default for LatencyConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            log_path: default_latency_log_path(),
+            provider_label: default_provider_label(),
+        }
+    }
+}
+
 impl Settings {
     pub fn load(path: &Path) -> Result<Self> {
         let raw = fs::read_to_string(path)?;
@@ -135,6 +159,11 @@ impl Settings {
         }
         if self.rpc.ws_url.trim().is_empty() {
             return Err(eyre!("rpc.ws_url must not be empty"));
+        }
+        if let Some(scan_http_url) = &self.rpc.scan_http_url
+            && scan_http_url.trim().is_empty()
+        {
+            return Err(eyre!("rpc.scan_http_url must not be empty when set"));
         }
         if self.rpc.chain_id == 0 {
             return Err(eyre!("rpc.chain_id must be greater than zero"));
@@ -164,6 +193,9 @@ impl Settings {
         let mut settings = self.clone();
         settings.rpc.http_url = redact_url(&settings.rpc.http_url);
         settings.rpc.ws_url = redact_url(&settings.rpc.ws_url);
+        if let Some(scan_http_url) = &mut settings.rpc.scan_http_url {
+            *scan_http_url = redact_url(scan_http_url);
+        }
         settings
     }
 
@@ -221,10 +253,22 @@ impl Settings {
         if let Ok(value) = std::env::var("SNIPER_WS_RPC_URL") {
             self.rpc.ws_url = value;
         }
+        if let Ok(value) = std::env::var("SNIPER_SCAN_RPC_URL") {
+            self.rpc.scan_http_url = Some(value);
+        }
         if let Ok(value) = std::env::var("SNIPER_MAX_REQUESTS_PER_SECOND")
             && let Ok(parsed) = value.parse()
         {
             self.rpc.max_requests_per_second = parsed;
+        }
+        if let Ok(value) = std::env::var("SNIPER_PROVIDER_LABEL") {
+            self.latency.provider_label = value;
+        }
+        if let Ok(value) = std::env::var("SNIPER_LATENCY_LOG_PATH") {
+            self.latency.log_path = value;
+        }
+        if let Ok(value) = std::env::var("SNIPER_LATENCY_ENABLED") {
+            self.latency.enabled = matches!(value.as_str(), "1" | "true" | "TRUE" | "yes" | "YES");
         }
         if let Ok(value) = std::env::var("SNIPER_BUY_AMOUNT_UNITS") {
             self.strategy.buy_amount_units = value;
@@ -343,6 +387,14 @@ fn default_true() -> bool {
 
 fn default_price_log_path() -> String {
     "logs/prices.jsonl".to_owned()
+}
+
+fn default_latency_log_path() -> String {
+    "logs/latency.jsonl".to_owned()
+}
+
+fn default_provider_label() -> String {
+    "primary".to_owned()
 }
 
 fn default_max_sell_slippage_bps() -> u64 {

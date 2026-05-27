@@ -7,11 +7,13 @@ use alloy::{
     rpc::types::TransactionRequest,
 };
 use eyre::Result;
+use serde_json::json;
 use tracing::{info, warn};
 
 use crate::{
     abi::{FTRouter, IERC20},
     config::Settings,
+    latency::LatencyLogger,
     rate_limit::RpcRateLimiter,
 };
 
@@ -22,10 +24,12 @@ pub async fn buy_market<P>(
     market: Address,
     detected_at: Instant,
     rpc_limiter: &RpcRateLimiter,
+    latency: &LatencyLogger,
 ) -> Result<()>
 where
     P: Provider + Clone,
 {
+    let started_at = Instant::now();
     let router_address = settings.router_address()?;
     let amount = settings.buy_amount()?;
     let token_id = settings.outcome_token_id()?;
@@ -48,9 +52,28 @@ where
         )
         .calldata()
         .to_owned();
+    latency.record(
+        "buy_calldata_built",
+        started_at.elapsed().as_millis(),
+        Some(market),
+        json!({
+            "token_id": token_id.to_string(),
+            "amount": amount.to_string(),
+        }),
+    );
 
+    let gas_started_at = Instant::now();
     let gas_price =
         bumped_gas_price(provider, rpc_limiter, settings.strategy.gas_price_bump_bps).await?;
+    latency.record(
+        "rpc_eth_gasPrice",
+        gas_started_at.elapsed().as_millis(),
+        Some(market),
+        json!({
+            "gas_price": gas_price.to_string(),
+            "gas_price_bump_bps": settings.strategy.gas_price_bump_bps,
+        }),
+    );
     let elapsed_ms = detected_at.elapsed().as_millis();
 
     if settings.strategy.dry_run {
@@ -62,6 +85,16 @@ where
             elapsed_ms,
             "dry-run enabled; buy transaction not sent"
         );
+        latency.record(
+            "buy_dry_run_total",
+            elapsed_ms,
+            Some(market),
+            json!({
+                "token_id": token_id.to_string(),
+                "amount": amount.to_string(),
+                "gas_price": gas_price.to_string(),
+            }),
+        );
         return Ok(());
     }
 
@@ -72,12 +105,45 @@ where
         .with_gas_limit(settings.strategy.gas_limit)
         .with_gas_price(gas_price);
 
+    let send_started_at = Instant::now();
     rpc_limiter.wait().await;
-    let pending = provider.send_transaction(tx).await?;
+    let pending = match provider.send_transaction(tx).await {
+        Ok(pending) => pending,
+        Err(err) => {
+            latency.record(
+                "rpc_eth_sendRawTransaction_error",
+                send_started_at.elapsed().as_millis(),
+                Some(market),
+                json!({
+                    "error": err.to_string(),
+                }),
+            );
+            return Err(err.into());
+        }
+    };
     let tx_hash = *pending.tx_hash();
     info!(%market, %tx_hash, elapsed_ms, "buy transaction submitted");
+    latency.record(
+        "rpc_eth_sendRawTransaction",
+        send_started_at.elapsed().as_millis(),
+        Some(market),
+        json!({
+            "tx_hash": tx_hash.to_string(),
+        }),
+    );
+    latency.record(
+        "buy_submitted_total",
+        detected_at.elapsed().as_millis(),
+        Some(market),
+        json!({
+            "tx_hash": tx_hash.to_string(),
+            "token_id": token_id.to_string(),
+            "amount": amount.to_string(),
+        }),
+    );
 
     if settings.strategy.wait_for_receipt {
+        let receipt_started_at = Instant::now();
         rpc_limiter.wait().await;
         let receipt = pending.get_receipt().await?;
         info!(
@@ -86,6 +152,16 @@ where
             block_number = ?receipt.block_number,
             status = receipt.status(),
             "buy transaction included"
+        );
+        latency.record(
+            "buy_receipt",
+            receipt_started_at.elapsed().as_millis(),
+            Some(market),
+            json!({
+                "tx_hash": receipt.transaction_hash.to_string(),
+                "block_number": receipt.block_number,
+                "status": receipt.status(),
+            }),
         );
     }
 
@@ -98,6 +174,7 @@ pub async fn approve_router<P>(
     wallet_address: Address,
     infinite: bool,
     rpc_limiter: &RpcRateLimiter,
+    latency: &LatencyLogger,
 ) -> Result<()>
 where
     P: Provider + Clone,
@@ -105,8 +182,18 @@ where
     let token = settings.collateral_address()?;
     let router = settings.router_address()?;
     let erc20 = IERC20::new(token, provider.clone());
+    let allowance_started_at = Instant::now();
     rpc_limiter.wait().await;
     let allowance = erc20.allowance(wallet_address, router).call().await?;
+    latency.record(
+        "rpc_allowance",
+        allowance_started_at.elapsed().as_millis(),
+        None,
+        json!({
+            "token": token.to_string(),
+            "router": router.to_string(),
+        }),
+    );
 
     let amount = if infinite {
         U256::MAX
@@ -120,8 +207,18 @@ where
     }
 
     let calldata = erc20.approve(router, amount).calldata().to_owned();
+    let gas_started_at = Instant::now();
     let gas_price =
         bumped_gas_price(provider, rpc_limiter, settings.strategy.gas_price_bump_bps).await?;
+    latency.record(
+        "rpc_eth_gasPrice",
+        gas_started_at.elapsed().as_millis(),
+        None,
+        json!({
+            "context": "approve",
+            "gas_price": gas_price.to_string(),
+        }),
+    );
 
     if settings.strategy.dry_run {
         warn!(
@@ -141,11 +238,22 @@ where
         .with_gas_limit(80_000)
         .with_gas_price(gas_price);
 
+    let send_started_at = Instant::now();
     rpc_limiter.wait().await;
     let pending = provider.send_transaction(tx).await?;
     let tx_hash = *pending.tx_hash();
     info!(%tx_hash, "approve transaction submitted");
+    latency.record(
+        "rpc_eth_sendRawTransaction",
+        send_started_at.elapsed().as_millis(),
+        None,
+        json!({
+            "context": "approve",
+            "tx_hash": tx_hash.to_string(),
+        }),
+    );
 
+    let receipt_started_at = Instant::now();
     rpc_limiter.wait().await;
     let receipt = pending.get_receipt().await?;
     info!(
@@ -153,6 +261,16 @@ where
         block_number = ?receipt.block_number,
         status = receipt.status(),
         "approve transaction included"
+    );
+    latency.record(
+        "approve_receipt",
+        receipt_started_at.elapsed().as_millis(),
+        None,
+        json!({
+            "tx_hash": receipt.transaction_hash.to_string(),
+            "block_number": receipt.block_number,
+            "status": receipt.status(),
+        }),
     );
 
     Ok(())

@@ -11,6 +11,8 @@ The implementation uses Rust, Tokio, and Alloy because the hot path is network I
 - Builds router calldata for `FTRouter.swapSimple`.
 - Applies a configurable legacy gas-price bump for BNB Chain.
 - Respects the configured QuickNode HTTP RPC budget, defaulting to 15 requests/second.
+- Supports QuickNode or Alchemy BNB RPC URLs, with an optional separate scan RPC for historical log research.
+- Writes latency JSONL records for RPC calls and buy-path milestones.
 - Computes sell quotes, slippage, fee/tax impact, and JSONL pricing logs outside the buy hot path.
 - Provides an `approve` command for the BUSDT router allowance.
 - Defaults to `dry_run = true`.
@@ -27,6 +29,21 @@ cargo run --release -- run
 ```
 
 For real trading, replace the example RPC URLs with a paid low-latency BNB Chain endpoint near Tokyo and set `dry_run = false` only after testing with a dedicated wallet.
+
+Alchemy BNB endpoints can be used directly:
+
+```toml
+[rpc]
+http_url = "https://bnb-mainnet.g.alchemy.com/v2/your-api-key"
+ws_url = "wss://bnb-mainnet.g.alchemy.com/v2/your-api-key"
+scan_http_url = "https://bnb-mainnet.g.alchemy.com/v2/your-api-key"
+max_requests_per_second = 15
+
+[latency]
+provider_label = "alchemy-payg"
+```
+
+For a safer migration, keep the live endpoint on the current provider and use Alchemy PAYG only for historical scanning through `scan_http_url` until latency benchmarks show it is faster for your location.
 
 ## RPC Budget
 
@@ -63,6 +80,13 @@ Historical replay defaults to `tolerance-wei = 100000000000000` because the repl
 QuickNode Discover currently limits `eth_getLogs` to very small block ranges. Use `--scan-rpc-url` with a log-friendly endpoint for offline validation while keeping the configured low-latency QuickNode endpoint for quote replay and live execution.
 If a public scan endpoint rate-limits, lower `--scan-max-requests-per-second`; this does not change the live QuickNode execution budget in `config.toml`.
 
+You can also put a paid scan provider in config instead of passing it each time:
+
+```toml
+[rpc]
+scan_http_url = "https://bnb-mainnet.g.alchemy.com/v2/your-api-key"
+```
+
 To re-check existing JSONL validation logs without any RPC calls:
 
 ```bash
@@ -70,6 +94,21 @@ cargo run --release -- validate-pricing-log logs/pricing-validation-100.jsonl
 ```
 
 The interactive trade simulation explainer is available at `docs/pricing-formulas.html`. It walks through market creation, inferred initial liquidity, buy execution, later market movement, and sell recovery with confirmed versus inferred data labels.
+
+## Latency Monitoring
+
+Latency records are written as JSONL to `logs/latency.jsonl` when `[latency].enabled = true`. The buy path records calldata build time, gas-price RPC latency, transaction broadcast latency, and total detection-to-submit time. Writes are spawned asynchronously so they do not block transaction submission.
+
+Run a baseline HTTP RPC benchmark before switching providers:
+
+```bash
+cargo run --release -- bench-rpc --iterations 20 --provider-label quicknode-discover
+cargo run --release -- bench-rpc --iterations 20 \
+  --http-url https://bnb-mainnet.g.alchemy.com/v2/your-api-key \
+  --provider-label alchemy-payg
+```
+
+Compare `eth_blockNumber_ms`, `eth_gasPrice_ms`, and the appended JSONL records. Do not migrate the live WebSocket or broadcast path until QuickNode and Alchemy have been measured from the same machine at the same time window.
 
 ## Current 42 Addresses
 

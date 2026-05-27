@@ -1,6 +1,7 @@
 mod abi;
 mod config;
 mod execution;
+mod latency;
 mod metadata;
 mod price;
 mod rate_limit;
@@ -20,7 +21,9 @@ use clap::{Args, Parser, Subcommand};
 use config::Settings;
 use eyre::{Context, Result, eyre};
 use futures_util::StreamExt;
+use latency::LatencyLogger;
 use rate_limit::RpcRateLimiter;
+use serde_json::json;
 use tracing::{debug, error, info, warn};
 use url::Url;
 
@@ -60,6 +63,8 @@ enum Command {
     ValidatePricing(ValidatePricingArgs),
     /// Validate existing pricing validation JSONL logs without RPC calls.
     ValidatePricingLog(ValidatePricingLogArgs),
+    /// Measure baseline RPC latency and write JSONL latency records.
+    BenchRpc(BenchRpcArgs),
 }
 
 #[derive(Debug, Args)]
@@ -107,6 +112,22 @@ struct ValidatePricingLogArgs {
     tolerance_wei: String,
 }
 
+#[derive(Debug, Args)]
+struct BenchRpcArgs {
+    /// Number of eth_blockNumber + eth_gasPrice rounds to run.
+    #[arg(long, default_value_t = 10)]
+    iterations: usize,
+    /// Optional HTTP RPC URL. Defaults to rpc.scan_http_url when set, otherwise rpc.http_url.
+    #[arg(long)]
+    http_url: Option<String>,
+    /// Label stored in logs, for example quicknode-discover or alchemy-payg.
+    #[arg(long)]
+    provider_label: Option<String>,
+    /// Optional request budget for this benchmark.
+    #[arg(long)]
+    max_requests_per_second: Option<u32>,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     init_tracing();
@@ -138,6 +159,7 @@ async fn main() -> Result<()> {
         }
         Command::ValidatePricing(args) => validate_pricing(settings, args).await,
         Command::ValidatePricingLog(args) => validate_pricing_log(args).await,
+        Command::BenchRpc(args) => bench_rpc(settings, args).await,
     }
 }
 
@@ -150,6 +172,7 @@ async fn run(settings: Settings) -> Result<()> {
         .wallet(signer)
         .connect_http(settings.rpc.http_url.parse::<Url>()?);
     let rpc_limiter = RpcRateLimiter::new(settings.rpc.max_requests_per_second);
+    let latency_logger = LatencyLogger::from_settings(&settings);
 
     let ws_provider = ProviderBuilder::new()
         .connect_ws(WsConnect::new(settings.rpc.ws_url.clone()))
@@ -167,6 +190,9 @@ async fn run(settings: Settings) -> Result<()> {
         wallet = %wallet_address,
         dry_run = settings.strategy.dry_run,
         rpc_max_rps = settings.rpc.max_requests_per_second,
+        latency_enabled = settings.latency.enabled,
+        latency_log_path = %settings.latency.log_path,
+        provider = %settings.latency.provider_label,
         "starting 42Space sniper"
     );
 
@@ -214,6 +240,19 @@ async fn run(settings: Settings) -> Result<()> {
                     timestamp_start = %decoded.timestampStart,
                     "new market detected"
                 );
+                latency_logger.record(
+                    "ws_create_market_received",
+                    0,
+                    Some(decoded.market),
+                    json!({
+                        "collateral": decoded.collateral.to_string(),
+                        "parent_token_id": decoded.parentTokenId.to_string(),
+                        "curve": decoded.curve.to_string(),
+                        "block_number": log.block_number,
+                        "tx_hash": log.transaction_hash.map(|hash| hash.to_string()),
+                        "log_index": log.log_index,
+                    }),
+                );
 
                 if settings.metadata.enabled {
                     let client = metadata_client.clone();
@@ -233,6 +272,7 @@ async fn run(settings: Settings) -> Result<()> {
                     decoded.market,
                     received_at,
                     &rpc_limiter,
+                    &latency_logger,
                 )
                 .await
                 {
@@ -264,8 +304,17 @@ async fn approve(settings: Settings, infinite: bool) -> Result<()> {
         .wallet(signer)
         .connect_http(settings.rpc.http_url.parse::<Url>()?);
     let rpc_limiter = RpcRateLimiter::new(settings.rpc.max_requests_per_second);
+    let latency_logger = LatencyLogger::from_settings(&settings);
 
-    execution::approve_router(&provider, &settings, wallet_address, infinite, &rpc_limiter).await
+    execution::approve_router(
+        &provider,
+        &settings,
+        wallet_address,
+        infinite,
+        &rpc_limiter,
+        &latency_logger,
+    )
+    .await
 }
 
 async fn quote_sell(
@@ -281,6 +330,7 @@ async fn quote_sell(
     let provider = ProviderBuilder::new().connect_http(settings.rpc.http_url.parse::<Url>()?);
     let rpc_limiter = RpcRateLimiter::new(settings.rpc.max_requests_per_second);
     let engine = price::PriceEngine::new(provider, settings.clone(), rpc_limiter);
+    let latency_logger = LatencyLogger::from_settings(&settings);
     let token_id = settings.outcome_token_id()?;
 
     let amount = if let Some(amount_units) = amount_units {
@@ -296,7 +346,21 @@ async fn quote_sell(
         price::SellAmount::WalletBalance(wallet)
     };
 
+    let quote_started_at = Instant::now();
     let quote = engine.quote_sell_exact_ot(market, token_id, amount).await?;
+    latency_logger
+        .record_blocking(
+            "quote_sell_total",
+            quote_started_at.elapsed().as_millis(),
+            Some(market),
+            json!({
+                "token_id": token_id.to_string(),
+                "slippage_bps": quote.slippage_bps,
+                "effective_loss_bps": quote.effective_loss_bps,
+                "executable": quote.executable,
+            }),
+        )
+        .await?;
     engine.log_sell_quote("quote_sell", None, &quote).await?;
     println!(
         "{}",
@@ -340,8 +404,9 @@ async fn validate_pricing(settings: Settings, args: ValidatePricingArgs) -> Resu
     let quote_provider = ProviderBuilder::new().connect_http(settings.rpc.http_url.parse::<Url>()?);
     let scan_url = args
         .scan_rpc_url
-        .as_deref()
-        .unwrap_or(&settings.rpc.http_url);
+        .clone()
+        .or_else(|| settings.rpc.scan_http_url.clone())
+        .unwrap_or_else(|| settings.rpc.http_url.clone());
     let scan_provider = ProviderBuilder::new().connect_http(scan_url.parse::<Url>()?);
     let quote_limiter = RpcRateLimiter::new(settings.rpc.max_requests_per_second);
     let scan_limiter = RpcRateLimiter::new(args.scan_max_requests_per_second);
@@ -398,6 +463,96 @@ async fn validate_pricing(settings: Settings, args: ValidatePricingArgs) -> Resu
     }
 
     Ok(())
+}
+
+async fn bench_rpc(mut settings: Settings, args: BenchRpcArgs) -> Result<()> {
+    if args.iterations == 0 {
+        return Err(eyre!("iterations must be greater than zero"));
+    }
+    if let Some(label) = args.provider_label {
+        settings.latency.provider_label = label;
+    }
+
+    let http_url = args
+        .http_url
+        .or_else(|| settings.rpc.scan_http_url.clone())
+        .unwrap_or_else(|| settings.rpc.http_url.clone());
+    let provider = ProviderBuilder::new().connect_http(http_url.parse::<Url>()?);
+    let limiter = RpcRateLimiter::new(
+        args.max_requests_per_second
+            .unwrap_or(settings.rpc.max_requests_per_second),
+    );
+    let latency_logger = LatencyLogger::from_settings(&settings);
+    let mut block_latencies = Vec::with_capacity(args.iterations);
+    let mut gas_latencies = Vec::with_capacity(args.iterations);
+
+    for iteration in 0..args.iterations {
+        limiter.wait().await;
+        let started_at = Instant::now();
+        let block_number = provider.get_block_number().await?;
+        let elapsed_ms = started_at.elapsed().as_millis();
+        block_latencies.push(elapsed_ms);
+        latency_logger
+            .record_blocking(
+                "bench_eth_blockNumber",
+                elapsed_ms,
+                None,
+                json!({
+                    "iteration": iteration,
+                    "block_number": block_number,
+                }),
+            )
+            .await?;
+
+        limiter.wait().await;
+        let started_at = Instant::now();
+        let gas_price = provider.get_gas_price().await?;
+        let elapsed_ms = started_at.elapsed().as_millis();
+        gas_latencies.push(elapsed_ms);
+        latency_logger
+            .record_blocking(
+                "bench_eth_gasPrice",
+                elapsed_ms,
+                None,
+                json!({
+                    "iteration": iteration,
+                    "gas_price": gas_price.to_string(),
+                }),
+            )
+            .await?;
+    }
+
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&json!({
+            "provider": settings.latency.provider_label,
+            "iterations": args.iterations,
+            "eth_blockNumber_ms": latency_summary(block_latencies),
+            "eth_gasPrice_ms": latency_summary(gas_latencies),
+            "log_path": settings.latency.log_path,
+        }))?
+    );
+
+    Ok(())
+}
+
+fn latency_summary(mut values: Vec<u128>) -> serde_json::Value {
+    values.sort_unstable();
+    json!({
+        "min": percentile(&values, 0.0),
+        "p50": percentile(&values, 0.50),
+        "p95": percentile(&values, 0.95),
+        "max": percentile(&values, 1.0),
+    })
+}
+
+fn percentile(values: &[u128], quantile: f64) -> u128 {
+    if values.is_empty() {
+        return 0;
+    }
+
+    let index = ((values.len() - 1) as f64 * quantile).round() as usize;
+    values[index.min(values.len() - 1)]
 }
 
 async fn validate_pricing_log(args: ValidatePricingLogArgs) -> Result<()> {
