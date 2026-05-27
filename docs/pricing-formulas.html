@@ -211,12 +211,92 @@
       overflow-wrap: anywhere;
     }
 
-    .cash-row .minus {
+    .minus {
       color: var(--red);
     }
 
-    .cash-row .plus {
+    .plus {
       color: var(--green);
+    }
+
+    .plain-ledger {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 14px;
+      margin-bottom: 18px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .plain-ledger h2 {
+      margin-bottom: 2px;
+    }
+
+    .ledger-line {
+      display: grid;
+      grid-template-columns: 28px minmax(0, 1fr) minmax(150px, 0.35fr);
+      align-items: center;
+      gap: 12px;
+      min-height: 40px;
+      border-top: 1px solid var(--line);
+      padding-top: 10px;
+    }
+
+    .ledger-line:first-of-type {
+      border-top: 0;
+      padding-top: 0;
+    }
+
+    .ledger-line span {
+      display: inline-flex;
+      width: 28px;
+      height: 28px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      background: #eaf5ef;
+      color: var(--green);
+      font-size: 12px;
+      font-weight: 750;
+    }
+
+    .ledger-line p {
+      color: var(--ink);
+      font-size: 14px;
+      font-weight: 650;
+    }
+
+    .ledger-line b {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 14px;
+      text-align: right;
+      overflow-wrap: anywhere;
+    }
+
+    .unit-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+
+    .unit {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 10px;
+      background: #fff;
+      min-width: 0;
+    }
+
+    .unit b {
+      display: block;
+      margin-bottom: 3px;
+      font-size: 13px;
+    }
+
+    .unit p {
+      font-size: 12px;
     }
 
     .decision-list {
@@ -371,7 +451,8 @@
       .top-grid,
       .decision-board,
       .formula-grid,
-      .flow {
+      .flow,
+      .unit-strip {
         grid-template-columns: 1fr;
       }
     }
@@ -392,7 +473,7 @@
   <main>
     <aside>
       <h1>42Space 定价公式实验台</h1>
-      <p class="lead">调参数后右侧会即时更新买入均价、赎回报价、赎回税、磨损和 50% 卖出保护。</p>
+      <p class="lead">所有金额用 USDT，数量用 OT，价格用 USDT/OT，比例用 bps/%。先看一笔账，再看公式。</p>
 
       <div class="controls">
         <section class="control">
@@ -405,15 +486,15 @@
 
         <section class="control">
           <div class="label-row">
-            <label for="sellAmount">赎回数量 OT</label>
+            <label for="sellAmount">准备卖出的数量 OT</label>
             <output id="sellAmountOut"></output>
           </div>
-          <input id="sellAmount" type="range" min="100" max="30000" step="100" value="5500">
+          <input id="sellAmount" type="range" min="100" max="30000" step="100" value="1600">
         </section>
 
         <section class="control">
           <div class="label-row">
-            <label for="prePrice">卖出前边际价格</label>
+            <label for="prePrice">当前边际价格 USDT/OT</label>
             <output id="prePriceOut"></output>
           </div>
           <input id="prePrice" type="range" min="0.02" max="0.98" step="0.005" value="0.62">
@@ -421,7 +502,7 @@
 
         <section class="control">
           <div class="label-row">
-            <label for="curveImpact">曲线磨损强度</label>
+            <label for="curveImpact">曲线磨损强度 bps</label>
             <output id="curveImpactOut"></output>
           </div>
           <input id="curveImpact" type="range" min="0" max="6500" step="25" value="900">
@@ -429,7 +510,7 @@
 
         <section class="control">
           <div class="label-row">
-            <label for="protocolTax">赎回税</label>
+            <label for="protocolTax">赎回税 bps</label>
             <output id="protocolTaxOut"></output>
           </div>
           <input id="protocolTax" type="range" min="0" max="500" step="1" value="80">
@@ -437,7 +518,7 @@
 
         <section class="control">
           <div class="label-row">
-            <label for="extraTax">额外卖出税</label>
+            <label for="extraTax">额外卖出税 bps</label>
             <output id="extraTaxOut"></output>
           </div>
           <input id="extraTax" type="range" min="0" max="3000" step="25" value="0">
@@ -445,7 +526,7 @@
 
         <section class="control">
           <div class="label-row">
-            <label for="buyBudget">买入预算</label>
+            <label for="buyBudget">买入预算 USDT</label>
             <output id="buyBudgetOut"></output>
           </div>
           <input id="buyBudget" type="range" min="10" max="5000" step="10" value="800">
@@ -453,7 +534,7 @@
 
         <section class="control">
           <div class="label-row">
-            <label for="buyOt">买到 OT</label>
+            <label for="buyOt">买到 / 持有数量 OT</label>
             <output id="buyOtOut"></output>
           </div>
           <input id="buyOt" type="range" min="10" max="20000" step="10" value="1600">
@@ -461,7 +542,7 @@
 
         <section class="control">
           <div class="label-row">
-            <label for="buyGas">买入 gas 成本</label>
+            <label for="buyGas">买入 gas 成本 USDT</label>
             <output id="buyGasOut"></output>
           </div>
           <input id="buyGas" type="range" min="0" max="80" step="0.1" value="1.8">
@@ -469,7 +550,7 @@
 
         <section class="control">
           <div class="label-row">
-            <label for="sellGas">卖出 gas 成本</label>
+            <label for="sellGas">卖出 gas 成本 USDT</label>
             <output id="sellGasOut"></output>
           </div>
           <input id="sellGas" type="range" min="0" max="80" step="0.1" value="1.8">
@@ -484,6 +565,50 @@
     </aside>
 
     <section class="workspace">
+      <section class="plain-ledger">
+        <h2>先只看这条账</h2>
+        <p>单位统一为 USDT 和 OT；默认按“买入后全部卖出”展示。如果只卖一部分，调左侧准备卖出的数量 OT。</p>
+        <div class="ledger-line">
+          <span>1</span>
+          <p>你买入时总共花出去</p>
+          <b id="simpleCost"></b>
+        </div>
+        <div class="ledger-line">
+          <span>2</span>
+          <p>你现在卖出这些 OT，链上曲线先给一个总赎回值</p>
+          <b id="simpleGross"></b>
+        </div>
+        <div class="ledger-line">
+          <span>3</span>
+          <p>扣掉赎回税、额外税和卖出 gas 后，钱包实际收回</p>
+          <b id="simpleRecovered"></b>
+        </div>
+        <div class="ledger-line">
+          <span>4</span>
+          <p>所以这笔从买到卖的净结果</p>
+          <b id="simplePnl"></b>
+        </div>
+      </section>
+
+      <section class="unit-strip" aria-label="单位说明">
+        <div class="unit">
+          <b>USDT</b>
+          <p>抵押币金额；页面里的 gas 也换算成 USDT。</p>
+        </div>
+        <div class="unit">
+          <b>OT</b>
+          <p>Outcome Token 数量，也就是你买到和准备卖出的份额。</p>
+        </div>
+        <div class="unit">
+          <b>USDT / OT</b>
+          <p>单个 OT 的价格；买入均价和边际价格都用这个单位。</p>
+        </div>
+        <div class="unit">
+          <b>bps</b>
+          <p>万分比；80 bps = 0.8%，5000 bps = 50%。</p>
+        </div>
+      </section>
+
       <section class="decision-board">
         <article class="panel">
           <h2>这一刻买入时，真正要看什么</h2>
@@ -492,14 +617,14 @@
               <strong>环境固定项</strong>
               <p>市场合约、抵押币、outcome token、曲线合约、协议赎回税、router 地址。这些不是下单时临时决定的。</p>
               <div class="pill-row">
-                <span class="pill">BUSDT collateral</span>
+                <span class="pill">抵押币: BUSDT/USDT</span>
                 <span class="pill">FTRouter.swapSimple</span>
-                <span class="pill">赎回税约 80 bps</span>
+                <span class="pill">赎回税: 80 bps = 0.8%</span>
               </div>
             </div>
             <div class="decision-item">
               <strong>买入瞬间变量</strong>
-              <p>你愿意花多少 collateral、gas 是否足够、是否已有 allowance、市场是否刚创建且符合过滤条件。狙击时不要等卖出价格计算。</p>
+              <p>你愿意花多少 USDT、gas 是否足够、是否已有 allowance、市场是否刚创建且符合过滤条件。狙击时不要等卖出价格计算。</p>
               <div class="pill-row">
                 <span class="pill" id="buyBudgetPill"></span>
                 <span class="pill" id="buyOtPill"></span>
@@ -523,7 +648,7 @@
             </div>
             <div class="cash-row">
               <span>spot 估值</span>
-              <p>按卖出前边际价格估算</p>
+              <p>按当前边际价格估算</p>
               <b id="cashSpot"></b>
             </div>
             <div class="cash-row">
@@ -548,7 +673,7 @@
             </div>
             <div class="cash-row">
               <span>最终收回</span>
-              <p>到手 collateral - 卖出 gas</p>
+              <p>到手 USDT - 卖出 gas</p>
               <b class="plus" id="cashRecover"></b>
             </div>
             <div class="cash-row">
@@ -605,32 +730,33 @@
         <article class="panel formula">
           <h2>1. 买入价格</h2>
           <p><strong>实盘策略：</strong>买入热路径不先算价，直接用 `swapSimple` exact-in 发送交易。价格在成交后用事件或日志解释。</p>
-          <code>avg_buy_price = collateral_spent / ot_received</code>
+          <code>avg_buy_price_usdt_per_ot = spent_usdt / received_ot</code>
           <p id="buyExplain"></p>
         </article>
 
         <article class="panel formula">
           <h2>2. 赎回定价</h2>
           <p>卖出服务用曲线合约对指定 OT 数量报价，链上返回用户到手和金库税两部分。</p>
-          <code>redeem = calRedeemValueByOtDelta(market, tokenId, otDelta)
-gross_redeem = collateralToUser + collateralToTreasury</code>
+          <code>user_redeem_usdt, treasury_tax_usdt = calRedeemValueByOtDelta(market, tokenId, sell_OT)
+gross_redeem_usdt = user_redeem_usdt + treasury_tax_usdt</code>
           <p id="redeemExplain"></p>
         </article>
 
         <article class="panel formula">
           <h2>3. 赎回税</h2>
           <p>赎回税不是从配置里猜，而是由链上报价中的 treasury 部分反推。</p>
-          <code>protocol_tax_bps = collateralToTreasury / gross_redeem * 10000</code>
+          <code>protocol_tax_bps = treasury_tax_usdt / gross_redeem_usdt * 10000
+80 bps = 0.8%</code>
           <p id="taxExplain"></p>
         </article>
 
         <article class="panel formula">
           <h2>4. 磨损与保护</h2>
           <p>磨损只比较边际现货估值和曲线赎回总值；有效损耗再把协议税和额外卖出税算进去。</p>
-          <code>spot_value = otDelta * pre_marginal_price / 10^decimals
-slippage_bps = max(0, spot_value - gross_redeem) / spot_value * 10000
-final_recovered = collateralToUser - extra_sell_tax - sell_gas
-effective_loss_bps = max(0, spot_value - final_recovered) / spot_value * 10000</code>
+          <code>spot_value_usdt = sell_OT * current_marginal_price_usdt_per_ot
+slippage_bps = max(0, spot_value_usdt - gross_redeem_usdt) / spot_value_usdt * 10000
+final_recovered_usdt = user_redeem_usdt - extra_sell_tax_usdt - sell_gas_usdt
+effective_loss_bps = max(0, spot_value_usdt - final_recovered_usdt) / spot_value_usdt * 10000</code>
           <p id="lossExplain"></p>
         </article>
       </section>
@@ -677,7 +803,7 @@ effective_loss_bps = max(0, spot_value - final_recovered) / spot_value * 10000</
     const presets = {
       calm: {
         preSupply: 42000,
-        sellAmount: 5500,
+        sellAmount: 1600,
         prePrice: 0.62,
         curveImpact: 900,
         protocolTax: 80,
@@ -689,25 +815,25 @@ effective_loss_bps = max(0, spot_value - final_recovered) / spot_value * 10000</
       },
       busy: {
         preSupply: 30000,
-        sellAmount: 14000,
+        sellAmount: 4200,
         prePrice: 0.48,
         curveImpact: 2400,
         protocolTax: 80,
         extraTax: 400,
         buyBudget: 1200,
-        buyOt: 1700,
+        buyOt: 4200,
         buyGas: 4.5,
         sellGas: 4.5
       },
       stress: {
         preSupply: 12000,
-        sellAmount: 10000,
+        sellAmount: 9000,
         prePrice: 0.35,
         curveImpact: 6200,
         protocolTax: 80,
         extraTax: 1400,
         buyBudget: 1500,
-        buyOt: 1400,
+        buyOt: 9000,
         buyGas: 12,
         sellGas: 12
       }
@@ -778,44 +904,62 @@ effective_loss_bps = max(0, spot_value - final_recovered) / spot_value * 10000</
       return (reference - actual) / reference * 10000;
     }
 
-    function money(value) {
-      return `${nf.format(value)} collateral`;
+    function usdt(value) {
+      return `${nf.format(value)} USDT`;
+    }
+
+    function signedUsdt(value) {
+      return `${value >= 0 ? "+" : ""}${usdt(value)}`;
+    }
+
+    function ot(value) {
+      return `${nf.format(value)} OT`;
+    }
+
+    function price(value) {
+      return `${value.toFixed(6)} USDT/OT`;
     }
 
     function bps(value) {
-      return `${nf.format(value)} bps`;
+      return `${nf.format(value)} bps (${(value / 100).toFixed(2)}%)`;
     }
 
     function updateOutputs(s, r) {
-      $("preSupplyOut").value = nf.format(s.preSupply);
-      $("sellAmountOut").value = nf.format(s.sellAmount);
-      $("prePriceOut").value = s.prePrice.toFixed(3);
+      $("preSupplyOut").value = ot(s.preSupply);
+      $("sellAmountOut").value = ot(s.sellAmount);
+      $("prePriceOut").value = `${s.prePrice.toFixed(3)} USDT/OT`;
       $("curveImpactOut").value = bps(s.curveImpactBps);
       $("protocolTaxOut").value = bps(s.protocolTaxBps);
       $("extraTaxOut").value = bps(s.extraTaxBps);
-      $("buyBudgetOut").value = money(s.buyBudget);
-      $("buyOtOut").value = `${nf.format(s.buyOt)} OT`;
-      $("buyGasOut").value = money(s.buyGas);
-      $("sellGasOut").value = money(s.sellGas);
+      $("buyBudgetOut").value = usdt(s.buyBudget);
+      $("buyOtOut").value = ot(s.buyOt);
+      $("buyGasOut").value = usdt(s.buyGas);
+      $("sellGasOut").value = usdt(s.sellGas);
 
-      $("avgBuyPrice").textContent = r.avgBuyPrice.toFixed(6);
-      $("grossRedeem").textContent = money(r.grossRedeem);
-      $("toUser").textContent = money(r.toUser);
-      $("treasuryFee").textContent = money(r.treasuryFee);
+      $("simpleCost").textContent = usdt(r.buyTotalCost);
+      $("simpleGross").textContent = usdt(r.grossRedeem);
+      $("simpleRecovered").textContent = usdt(r.recoveredAfterGas);
+      $("simplePnl").textContent = signedUsdt(r.pnl);
+      $("simplePnl").className = r.pnl >= 0 ? "plus" : "minus";
+
+      $("avgBuyPrice").textContent = price(r.avgBuyPrice);
+      $("grossRedeem").textContent = usdt(r.grossRedeem);
+      $("toUser").textContent = usdt(r.toUser);
+      $("treasuryFee").textContent = usdt(r.treasuryFee);
       $("slippage").textContent = bps(r.slippageBps);
       $("effectiveLoss").textContent = bps(r.effectiveLossBps);
 
-      $("buyBudgetPill").textContent = `预算 ${money(s.buyBudget)}`;
-      $("buyOtPill").textContent = `成交 ${nf.format(s.buyOt)} OT`;
-      $("avgBuyPill").textContent = `均价 ${r.avgBuyPrice.toFixed(6)}`;
-      $("cashBuyOut").textContent = `-${money(r.buyTotalCost)}`;
-      $("cashSpot").textContent = money(r.spotValue);
-      $("cashCurveLoss").textContent = `-${money(Math.max(0, r.spotValue - r.grossRedeem))}`;
-      $("cashProtocolTax").textContent = `-${money(r.treasuryFee)}`;
-      $("cashExtraTax").textContent = `-${money(r.extraTax)}`;
-      $("cashSellGas").textContent = `-${money(s.sellGas)}`;
-      $("cashRecover").textContent = money(r.recoveredAfterGas);
-      $("cashPnl").textContent = `${r.pnl >= 0 ? "+" : ""}${money(r.pnl)}`;
+      $("buyBudgetPill").textContent = `预算 ${usdt(s.buyBudget)}`;
+      $("buyOtPill").textContent = `持仓 ${ot(s.buyOt)}`;
+      $("avgBuyPill").textContent = `均价 ${price(r.avgBuyPrice)}`;
+      $("cashBuyOut").textContent = `-${usdt(r.buyTotalCost)}`;
+      $("cashSpot").textContent = usdt(r.spotValue);
+      $("cashCurveLoss").textContent = `-${usdt(Math.max(0, r.spotValue - r.grossRedeem))}`;
+      $("cashProtocolTax").textContent = `-${usdt(r.treasuryFee)}`;
+      $("cashExtraTax").textContent = `-${usdt(r.extraTax)}`;
+      $("cashSellGas").textContent = `-${usdt(s.sellGas)}`;
+      $("cashRecover").textContent = usdt(r.recoveredAfterGas);
+      $("cashPnl").textContent = signedUsdt(r.pnl);
       $("cashPnl").className = r.pnl >= 0 ? "plus" : "minus";
 
       const guard = r.slippageBps > 5000;
@@ -825,13 +969,13 @@ effective_loss_bps = max(0, spot_value - final_recovered) / spot_value * 10000</
         : `当前曲线磨损 ${bps(r.slippageBps)}，低于 50% 阈值，是否卖出再结合策略条件判断。`;
 
       $("buyExplain").textContent =
-        `这里的买入均价 = ${money(s.buyBudget)} / ${nf.format(s.buyOt)} OT = ${r.avgBuyPrice.toFixed(6)}。买入总成本还要加 gas：${money(r.buyTotalCost)}。`;
+        `这里的买入均价 = ${usdt(s.buyBudget)} / ${ot(s.buyOt)} = ${price(r.avgBuyPrice)}。买入总成本还要加 gas：${usdt(r.buyTotalCost)}。`;
       $("redeemExplain").textContent =
-        `按当前参数，spot 估值 ${money(r.spotValue)}，曲线赎回总值 ${money(r.grossRedeem)}，扣协议税后用户到手 ${money(r.toUser)}。`;
+        `按当前参数，spot 估值 ${usdt(r.spotValue)}，曲线赎回总值 ${usdt(r.grossRedeem)}，扣协议税后用户到手 ${usdt(r.toUser)}。`;
       $("taxExplain").textContent =
-        `赎回税 = ${money(r.treasuryFee)} / ${money(r.grossRedeem)} * 10000 = ${bps(s.protocolTaxBps)}。历史日志反推稳定为 80 bps。`;
+        `赎回税 = ${usdt(r.treasuryFee)} / ${usdt(r.grossRedeem)} * 10000 = ${bps(s.protocolTaxBps)}。历史日志反推稳定为 80 bps。`;
       $("lossExplain").textContent =
-        `曲线磨损 ${bps(r.slippageBps)}；扣掉协议税、额外卖出税和卖出 gas 后，最终收回 ${money(r.recoveredAfterGas)}，有效损耗为 ${bps(r.effectiveLossBps)}。`;
+        `曲线磨损 ${bps(r.slippageBps)}；扣掉协议税、额外卖出税和卖出 gas 后，最终收回 ${usdt(r.recoveredAfterGas)}，有效损耗为 ${bps(r.effectiveLossBps)}。`;
     }
 
     function drawCurve(s, r) {
@@ -894,11 +1038,11 @@ effective_loss_bps = max(0, spot_value - final_recovered) / spot_value * 10000</
 
       ctx.fillStyle = "#63716c";
       ctx.font = "24px ui-sans-serif, system-ui, sans-serif";
-      ctx.fillText("供应量", width - 112, height - 18);
+      ctx.fillText("供应量 (OT)", width - 160, height - 18);
       ctx.save();
       ctx.translate(22, 116);
       ctx.rotate(-Math.PI / 2);
-      ctx.fillText("边际价格", 0, 0);
+      ctx.fillText("边际价格 (USDT/OT)", 0, 0);
       ctx.restore();
     }
 
