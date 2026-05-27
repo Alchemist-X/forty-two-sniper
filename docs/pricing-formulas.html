@@ -178,6 +178,86 @@
       gap: 10px;
     }
 
+    .decision-board {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+
+    .cashflow {
+      display: grid;
+      gap: 10px;
+    }
+
+    .cash-row {
+      display: grid;
+      grid-template-columns: 122px minmax(0, 1fr) 120px;
+      align-items: center;
+      gap: 10px;
+      min-height: 42px;
+      border-bottom: 1px solid var(--line);
+      font-size: 13px;
+    }
+
+    .cash-row:last-child {
+      border-bottom: 0;
+    }
+
+    .cash-row b {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 13px;
+      text-align: right;
+      overflow-wrap: anywhere;
+    }
+
+    .cash-row .minus {
+      color: var(--red);
+    }
+
+    .cash-row .plus {
+      color: var(--green);
+    }
+
+    .decision-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .decision-item {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 12px;
+      background: #fff;
+    }
+
+    .decision-item strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 13px;
+    }
+
+    .decision-item p {
+      font-size: 13px;
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 12px;
+    }
+
+    .pill {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      background: #fbfcfa;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
     .metric {
       border: 1px solid var(--line);
       border-radius: 6px;
@@ -289,6 +369,7 @@
       }
 
       .top-grid,
+      .decision-board,
       .formula-grid,
       .flow {
         grid-template-columns: 1fr;
@@ -378,6 +459,22 @@
           <input id="buyOt" type="range" min="10" max="20000" step="10" value="1600">
         </section>
 
+        <section class="control">
+          <div class="label-row">
+            <label for="buyGas">买入 gas 成本</label>
+            <output id="buyGasOut"></output>
+          </div>
+          <input id="buyGas" type="range" min="0" max="80" step="0.1" value="1.8">
+        </section>
+
+        <section class="control">
+          <div class="label-row">
+            <label for="sellGas">卖出 gas 成本</label>
+            <output id="sellGasOut"></output>
+          </div>
+          <input id="sellGas" type="range" min="0" max="80" step="0.1" value="1.8">
+        </section>
+
         <div class="segmented" aria-label="场景">
           <button type="button" data-preset="calm" class="active">低磨损</button>
           <button type="button" data-preset="busy">拥挤</button>
@@ -387,6 +484,82 @@
     </aside>
 
     <section class="workspace">
+      <section class="decision-board">
+        <article class="panel">
+          <h2>这一刻买入时，真正要看什么</h2>
+          <div class="decision-list">
+            <div class="decision-item">
+              <strong>环境固定项</strong>
+              <p>市场合约、抵押币、outcome token、曲线合约、协议赎回税、router 地址。这些不是下单时临时决定的。</p>
+              <div class="pill-row">
+                <span class="pill">BUSDT collateral</span>
+                <span class="pill">FTRouter.swapSimple</span>
+                <span class="pill">赎回税约 80 bps</span>
+              </div>
+            </div>
+            <div class="decision-item">
+              <strong>买入瞬间变量</strong>
+              <p>你愿意花多少 collateral、gas 是否足够、是否已有 allowance、市场是否刚创建且符合过滤条件。狙击时不要等卖出价格计算。</p>
+              <div class="pill-row">
+                <span class="pill" id="buyBudgetPill"></span>
+                <span class="pill" id="buyOtPill"></span>
+                <span class="pill" id="avgBuyPill"></span>
+              </div>
+            </div>
+            <div class="decision-item">
+              <strong>买入后才知道</strong>
+              <p>实际拿到多少 OT、实际成交均价、后续别人买卖导致的供应量变化。这些决定你卖出时能收回多少钱。</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <h2>如果现在卖出，现金流怎么走</h2>
+          <div class="cashflow">
+            <div class="cash-row">
+              <span>买入支出</span>
+              <p>预算 + 买入 gas</p>
+              <b class="minus" id="cashBuyOut"></b>
+            </div>
+            <div class="cash-row">
+              <span>spot 估值</span>
+              <p>按卖出前边际价格估算</p>
+              <b id="cashSpot"></b>
+            </div>
+            <div class="cash-row">
+              <span>曲线磨损</span>
+              <p>大单砸曲线损失</p>
+              <b class="minus" id="cashCurveLoss"></b>
+            </div>
+            <div class="cash-row">
+              <span>赎回税</span>
+              <p>进入 treasury</p>
+              <b class="minus" id="cashProtocolTax"></b>
+            </div>
+            <div class="cash-row">
+              <span>额外卖出税</span>
+              <p>自定义保守扣减</p>
+              <b class="minus" id="cashExtraTax"></b>
+            </div>
+            <div class="cash-row">
+              <span>卖出 gas</span>
+              <p>链上执行成本</p>
+              <b class="minus" id="cashSellGas"></b>
+            </div>
+            <div class="cash-row">
+              <span>最终收回</span>
+              <p>到手 collateral - 卖出 gas</p>
+              <b class="plus" id="cashRecover"></b>
+            </div>
+            <div class="cash-row">
+              <span>净盈亏</span>
+              <p>最终收回 - 买入总成本</p>
+              <b id="cashPnl"></b>
+            </div>
+          </div>
+        </article>
+      </section>
+
       <div class="top-grid">
         <section class="panel canvas-wrap">
           <div>
@@ -456,7 +629,8 @@ gross_redeem = collateralToUser + collateralToTreasury</code>
           <p>磨损只比较边际现货估值和曲线赎回总值；有效损耗再把协议税和额外卖出税算进去。</p>
           <code>spot_value = otDelta * pre_marginal_price / 10^decimals
 slippage_bps = max(0, spot_value - gross_redeem) / spot_value * 10000
-effective_loss_bps = max(0, spot_value - net_to_user) / spot_value * 10000</code>
+final_recovered = collateralToUser - extra_sell_tax - sell_gas
+effective_loss_bps = max(0, spot_value - final_recovered) / spot_value * 10000</code>
           <p id="lossExplain"></p>
         </article>
       </section>
@@ -495,7 +669,9 @@ effective_loss_bps = max(0, spot_value - net_to_user) / spot_value * 10000</code
       protocolTax: document.getElementById("protocolTax"),
       extraTax: document.getElementById("extraTax"),
       buyBudget: document.getElementById("buyBudget"),
-      buyOt: document.getElementById("buyOt")
+      buyOt: document.getElementById("buyOt"),
+      buyGas: document.getElementById("buyGas"),
+      sellGas: document.getElementById("sellGas")
     };
 
     const presets = {
@@ -507,7 +683,9 @@ effective_loss_bps = max(0, spot_value - net_to_user) / spot_value * 10000</code
         protocolTax: 80,
         extraTax: 0,
         buyBudget: 800,
-        buyOt: 1600
+        buyOt: 1600,
+        buyGas: 1.8,
+        sellGas: 1.8
       },
       busy: {
         preSupply: 30000,
@@ -517,7 +695,9 @@ effective_loss_bps = max(0, spot_value - net_to_user) / spot_value * 10000</code
         protocolTax: 80,
         extraTax: 400,
         buyBudget: 1200,
-        buyOt: 1700
+        buyOt: 1700,
+        buyGas: 4.5,
+        sellGas: 4.5
       },
       stress: {
         preSupply: 12000,
@@ -527,7 +707,9 @@ effective_loss_bps = max(0, spot_value - net_to_user) / spot_value * 10000</code
         protocolTax: 80,
         extraTax: 1400,
         buyBudget: 1500,
-        buyOt: 1400
+        buyOt: 1400,
+        buyGas: 12,
+        sellGas: 12
       }
     };
 
@@ -546,7 +728,9 @@ effective_loss_bps = max(0, spot_value - net_to_user) / spot_value * 10000</code
         protocolTaxBps: Number(controls.protocolTax.value),
         extraTaxBps: Number(controls.extraTax.value),
         buyBudget: Number(controls.buyBudget.value),
-        buyOt: Number(controls.buyOt.value)
+        buyOt: Number(controls.buyOt.value),
+        buyGas: Number(controls.buyGas.value),
+        sellGas: Number(controls.sellGas.value)
       };
     }
 
@@ -559,10 +743,13 @@ effective_loss_bps = max(0, spot_value - net_to_user) / spot_value * 10000</code
       const toUser = grossRedeem - treasuryFee;
       const extraTax = toUser * s.extraTaxBps / 10000;
       const netToUser = Math.max(0, toUser - extraTax);
+      const recoveredAfterGas = Math.max(0, netToUser - s.sellGas);
       const slippageBps = lossBps(spotValue, grossRedeem);
-      const effectiveLossBps = lossBps(spotValue, netToUser);
+      const effectiveLossBps = lossBps(spotValue, recoveredAfterGas);
       const avgBuyPrice = s.buyBudget / Math.max(1, s.buyOt);
       const buyTax = s.buyBudget * s.protocolTaxBps / 10000;
+      const buyTotalCost = s.buyBudget + s.buyGas;
+      const pnl = recoveredAfterGas - buyTotalCost;
       const postSupply = s.preSupply - s.sellAmount;
       const postPrice = Math.max(0.001, s.prePrice * (1 - curveLossBps / 14000));
 
@@ -574,10 +761,13 @@ effective_loss_bps = max(0, spot_value - net_to_user) / spot_value * 10000</code
         toUser,
         extraTax,
         netToUser,
+        recoveredAfterGas,
         slippageBps,
         effectiveLossBps,
         avgBuyPrice,
         buyTax,
+        buyTotalCost,
+        pnl,
         postSupply,
         postPrice
       };
@@ -605,6 +795,8 @@ effective_loss_bps = max(0, spot_value - net_to_user) / spot_value * 10000</code
       $("extraTaxOut").value = bps(s.extraTaxBps);
       $("buyBudgetOut").value = money(s.buyBudget);
       $("buyOtOut").value = `${nf.format(s.buyOt)} OT`;
+      $("buyGasOut").value = money(s.buyGas);
+      $("sellGasOut").value = money(s.sellGas);
 
       $("avgBuyPrice").textContent = r.avgBuyPrice.toFixed(6);
       $("grossRedeem").textContent = money(r.grossRedeem);
@@ -613,6 +805,19 @@ effective_loss_bps = max(0, spot_value - net_to_user) / spot_value * 10000</code
       $("slippage").textContent = bps(r.slippageBps);
       $("effectiveLoss").textContent = bps(r.effectiveLossBps);
 
+      $("buyBudgetPill").textContent = `预算 ${money(s.buyBudget)}`;
+      $("buyOtPill").textContent = `成交 ${nf.format(s.buyOt)} OT`;
+      $("avgBuyPill").textContent = `均价 ${r.avgBuyPrice.toFixed(6)}`;
+      $("cashBuyOut").textContent = `-${money(r.buyTotalCost)}`;
+      $("cashSpot").textContent = money(r.spotValue);
+      $("cashCurveLoss").textContent = `-${money(Math.max(0, r.spotValue - r.grossRedeem))}`;
+      $("cashProtocolTax").textContent = `-${money(r.treasuryFee)}`;
+      $("cashExtraTax").textContent = `-${money(r.extraTax)}`;
+      $("cashSellGas").textContent = `-${money(s.sellGas)}`;
+      $("cashRecover").textContent = money(r.recoveredAfterGas);
+      $("cashPnl").textContent = `${r.pnl >= 0 ? "+" : ""}${money(r.pnl)}`;
+      $("cashPnl").className = r.pnl >= 0 ? "plus" : "minus";
+
       const guard = r.slippageBps > 5000;
       $("guardNote").className = `note ${guard ? "warn" : "ok"}`;
       $("guardNote").textContent = guard
@@ -620,13 +825,13 @@ effective_loss_bps = max(0, spot_value - net_to_user) / spot_value * 10000</code
         : `当前曲线磨损 ${bps(r.slippageBps)}，低于 50% 阈值，是否卖出再结合策略条件判断。`;
 
       $("buyExplain").textContent =
-        `这里的买入均价 = ${money(s.buyBudget)} / ${nf.format(s.buyOt)} OT = ${r.avgBuyPrice.toFixed(6)}。在 sniper 热路径中，这个值不参与阻塞买入。`;
+        `这里的买入均价 = ${money(s.buyBudget)} / ${nf.format(s.buyOt)} OT = ${r.avgBuyPrice.toFixed(6)}。买入总成本还要加 gas：${money(r.buyTotalCost)}。`;
       $("redeemExplain").textContent =
-        `按当前参数，spot 估值 ${money(r.spotValue)}，曲线赎回总值 ${money(r.grossRedeem)}，其中用户到手 ${money(r.toUser)}。`;
+        `按当前参数，spot 估值 ${money(r.spotValue)}，曲线赎回总值 ${money(r.grossRedeem)}，扣协议税后用户到手 ${money(r.toUser)}。`;
       $("taxExplain").textContent =
         `赎回税 = ${money(r.treasuryFee)} / ${money(r.grossRedeem)} * 10000 = ${bps(s.protocolTaxBps)}。历史日志反推稳定为 80 bps。`;
       $("lossExplain").textContent =
-        `曲线磨损 ${bps(r.slippageBps)}；扣掉协议税和额外卖出税后的有效损耗为 ${bps(r.effectiveLossBps)}。`;
+        `曲线磨损 ${bps(r.slippageBps)}；扣掉协议税、额外卖出税和卖出 gas 后，最终收回 ${money(r.recoveredAfterGas)}，有效损耗为 ${bps(r.effectiveLossBps)}。`;
     }
 
     function drawCurve(s, r) {
