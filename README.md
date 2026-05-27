@@ -69,6 +69,8 @@ To re-check existing JSONL validation logs without any RPC calls:
 cargo run --release -- validate-pricing-log logs/pricing-validation-100.jsonl
 ```
 
+The interactive formula explainer is available at `docs/pricing-formulas.html`.
+
 ## Current 42 Addresses
 
 These defaults are from the official 42 Deployments page checked on 2026-05-26:
