@@ -108,7 +108,15 @@ cargo run --release -- bench-rpc --iterations 20 \
   --provider-label alchemy-payg
 ```
 
-Compare `eth_blockNumber_ms`, `eth_gasPrice_ms`, and the appended JSONL records. Do not migrate the live WebSocket or broadcast path until QuickNode and Alchemy have been measured from the same machine at the same time window.
+Every benchmark summary includes `min`, `P50`, `P95`, and `max` in milliseconds. You can also summarize accumulated JSONL records:
+
+```bash
+cargo run --release -- latency-summary
+cargo run --release -- latency-summary --provider alchemy-payg
+cargo run --release -- latency-summary --stage rpc_eth_sendRawTransaction
+```
+
+Compare `eth_blockNumber_ms`, `eth_gasPrice_ms`, `rpc_eth_sendRawTransaction`, and `buy_submitted_total`. Do not migrate the live WebSocket or broadcast path until QuickNode and Alchemy have been measured from the same machine at the same time window.
 
 ## Current 42 Addresses
 

@@ -7,7 +7,11 @@ mod price;
 mod rate_limit;
 mod validation;
 
-use std::{collections::HashSet, path::PathBuf, time::Instant};
+use std::{
+    collections::{BTreeMap, HashSet},
+    path::PathBuf,
+    time::Instant,
+};
 
 use abi::FTMarketController;
 use alloy::{
@@ -65,6 +69,8 @@ enum Command {
     ValidatePricingLog(ValidatePricingLogArgs),
     /// Measure baseline RPC latency and write JSONL latency records.
     BenchRpc(BenchRpcArgs),
+    /// Summarize latency JSONL records by provider and stage.
+    LatencySummary(LatencySummaryArgs),
 }
 
 #[derive(Debug, Args)]
@@ -128,6 +134,19 @@ struct BenchRpcArgs {
     max_requests_per_second: Option<u32>,
 }
 
+#[derive(Debug, Args)]
+struct LatencySummaryArgs {
+    /// Latency JSONL file to summarize.
+    #[arg(long, default_value = "logs/latency.jsonl")]
+    input: PathBuf,
+    /// Optional provider label filter.
+    #[arg(long)]
+    provider: Option<String>,
+    /// Optional stage filter.
+    #[arg(long)]
+    stage: Option<String>,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     init_tracing();
@@ -160,6 +179,7 @@ async fn main() -> Result<()> {
         Command::ValidatePricing(args) => validate_pricing(settings, args).await,
         Command::ValidatePricingLog(args) => validate_pricing_log(args).await,
         Command::BenchRpc(args) => bench_rpc(settings, args).await,
+        Command::LatencySummary(args) => latency_summary_log(args).await,
     }
 }
 
@@ -540,8 +560,8 @@ fn latency_summary(mut values: Vec<u128>) -> serde_json::Value {
     values.sort_unstable();
     json!({
         "min": percentile(&values, 0.0),
-        "p50": percentile(&values, 0.50),
-        "p95": percentile(&values, 0.95),
+        "P50": percentile(&values, 0.50),
+        "P95": percentile(&values, 0.95),
         "max": percentile(&values, 1.0),
     })
 }
@@ -553,6 +573,75 @@ fn percentile(values: &[u128], quantile: f64) -> u128 {
 
     let index = ((values.len() - 1) as f64 * quantile).round() as usize;
     values[index.min(values.len() - 1)]
+}
+
+async fn latency_summary_log(args: LatencySummaryArgs) -> Result<()> {
+    let raw = tokio::fs::read_to_string(&args.input)
+        .await
+        .with_context(|| format!("failed to read {}", args.input.display()))?;
+    let mut groups = BTreeMap::<(String, String), Vec<u128>>::new();
+
+    for (line_index, line) in raw.lines().enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let value: serde_json::Value = serde_json::from_str(line).map_err(|err| {
+            eyre!(
+                "{}:{} invalid JSONL: {err}",
+                args.input.display(),
+                line_index + 1
+            )
+        })?;
+        let provider = value
+            .get("provider")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("unknown");
+        let stage = value
+            .get("stage")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("unknown");
+
+        if args
+            .provider
+            .as_deref()
+            .is_some_and(|filter| filter != provider)
+        {
+            continue;
+        }
+        if args.stage.as_deref().is_some_and(|filter| filter != stage) {
+            continue;
+        }
+
+        let Some(elapsed_ms) = value.get("elapsed_ms").and_then(serde_json::Value::as_u64) else {
+            continue;
+        };
+        groups
+            .entry((provider.to_owned(), stage.to_owned()))
+            .or_default()
+            .push(elapsed_ms as u128);
+    }
+
+    let summaries = groups
+        .into_iter()
+        .map(|((provider, stage), values)| {
+            json!({
+                "provider": provider,
+                "stage": stage,
+                "count": values.len(),
+                "elapsed_ms": latency_summary(values),
+            })
+        })
+        .collect::<Vec<_>>();
+
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&json!({
+            "input": args.input.display().to_string(),
+            "summaries": summaries,
+        }))?
+    );
+
+    Ok(())
 }
 
 async fn validate_pricing_log(args: ValidatePricingLogArgs) -> Result<()> {
